@@ -49,6 +49,8 @@ Lo viejo se queda en el Sheet como archivo.
 | `_lib/idempotency.js` | Deriva la llave de idempotencia del movimiento. |
 | `_lib/finanzas.js` | Lógica: DB-primero + espejo al Sheet + reglas iWin/Delca2. |
 | `_lib/sheet-mirror.js` | Espejo best-effort al Sheet (no bloquea la transacción). |
+| `_lib/config-datos.js` | Fase 1.5: lee `categorias`/`reglas` de la DB, con `app/src/config/*.js` como fallback si no responde/aún no se sembró. |
+| `scripts/seed-config-datos.js` | Siembra inicial (manual, una vez) de `categorias`/`reglas` desde los arrays hardcodeados. |
 | `api-movimientos.js` | `GET/POST /api/movimientos` — lista/búsqueda para SilvIA y dashboard. |
 
 ## Idempotencia — cómo funciona
@@ -65,10 +67,27 @@ El dedup por **ventana de ±3 días** (monto ±1 · comercio) se conserva como
 Cuando confirmas (`confirmar: true`) un duplicado genuino, se fuerza una llave
 única para que sí entre la segunda fila.
 
+## Fase 1.5 — config-como-datos (primera versión)
+
+`categorias` y `reglas` (tablas ya definidas en `sql/schema.sql` desde el motor
+inicial) ahora se **leen primero de la DB** desde `classify.js` (backend) y
+`/api/pwa-catalogos` (categorías de gasto para el formulario de la PWA), con
+los arrays de `app/src/config/{rules,categories}.js` como **semilla** (ver
+`scripts/seed-config-datos.js`, se corre una vez a mano contra Neon — no es
+automático) y como **fallback** si Postgres no responde o la tabla sigue vacía.
+
+Alcance de esta primera versión, y lo que queda pendiente/abierto:
+- **`cuentas` queda fuera** — sigue viviendo en el Sheet `⚙️ CUENTAS`
+  (`_lib/cuentas.js`); migrarla es una fase aparte.
+- **Sin UI de edición todavía**: hoy se agrega con un `insert` directo en Neon
+  (o reutilizando `insertCategoria`/`insertRegla` de `_lib/repo.js`), igual que
+  antes se editaba `rules.js` a mano.
+- **Abierto:** si el fallback a los arrays hardcodeados se queda permanente
+  (red de seguridad) o es solo transición mientras se valida el modelo en uso
+  real; si hace falta una UI mínima de alta/edición en una fase siguiente.
+
 ## Siguientes fases (no incluidas aquí)
 
-- **Fase 1.5 — config-como-datos:** poblar/leer `cuentas`, `categorias`, `reglas`
-  desde la DB para editarlas sin deploy.
 - **Fase 2 — dashboard online:** página en el sitio Netlify (auth Google que ya
   existe) que consume `/api/movimientos` y `/api/resumen` con gráficos.
 - **Export programada:** función agendada que vuelca la DB al Sheet como backup

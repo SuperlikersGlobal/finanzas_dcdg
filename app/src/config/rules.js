@@ -84,12 +84,15 @@ export const RULES = [
 /**
  * Clasifica una descripción/comercio con las reglas DCDG.
  * @param {string} descripcion  texto del comercio o descripción del gasto
+ * @param {Regla[]} [rules]  lista de reglas a usar (default: RULES hardcodeadas).
+ *   Permite que el llamador (p. ej. `_lib/classify.js`, Fase 1.5) inyecte reglas
+ *   leídas de la DB sin duplicar el algoritmo de matching.
  * @returns {null | {categoria, subcategoria, metodo_pago?, iwin_prestamo?, regla, fuente:'reglas'}}
  */
-export function classifyByRules(descripcion) {
+export function classifyByRules(descripcion, rules = RULES) {
   const n = normalize(descripcion);
   if (!n) return null;
-  for (const r of RULES) {
+  for (const r of rules) {
     if (r.match.some((kw) => n.includes(normalize(kw)))) {
       const out = {
         categoria: r.categoria,

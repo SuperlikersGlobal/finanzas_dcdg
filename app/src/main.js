@@ -7,7 +7,7 @@
  */
 
 import { getConfig, saveConfig } from './config/env.js';
-import { CATS, subcategorias, CUENTAS_FALLBACK, CET_CUENTAS } from './config/categories.js';
+import { CATS, CUENTAS_FALLBACK, CET_CUENTAS } from './config/categories.js';
 import {
   TARJETAS_MAP,
   setCuentasDinamicas,
@@ -15,7 +15,7 @@ import {
   isIwinAccount,
 } from './config/accounts.js';
 import { analizarTexto, analizarImagen } from './services/claude.js';
-import { getCuentas } from './services/finanzas.js';
+import { getCuentas, getCatalogos } from './services/finanzas.js';
 import {
   getSessionToken, signOut as authSignOut, isSignedIn,
   initSignIn, renderSignInButton, promptOneTap, gisReady,
@@ -57,6 +57,10 @@ let curImg = null; // { base64, mediaType, prev }
 let curIsIwin = false;
 let _accts = []; // cuentas cargadas (para los selects de transferencia)
 let _trModo = 'simple'; // 'simple' | 'monedas' — modo del flujo de Transferencia (#132)
+// Taxonomía de categorías/subcategorías activa. Arranca con la copia local
+// (`CATS`, sin red ni login) y se reemplaza por la de la DB (Fase 1.5,
+// config-como-datos) si `cargarCategorias()` consigue leerla — ver `connect()`.
+let _cats = CATS;
 
 // ── Navegación ────────────────────────────────────────────
 // Qué pestaña de la tab bar se resalta para cada pantalla.
@@ -171,6 +175,7 @@ async function connect() {
   if (isSignedIn()) {
     setConn(true);
     await cargarCuentas();
+    cargarCategorias(); // no bloqueante: si falla, se queda con la taxonomía local ya cargada
     return true;
   }
   setConn(false);
@@ -240,6 +245,25 @@ async function cargarCuentas() {
     }
   } catch (_) {
     buildAccountsDropdown(CUENTAS_FALLBACK);
+  }
+}
+
+// ── Categorías dinámicas (Fase 1.5: config-como-datos) ────
+/**
+ * Intenta refrescar la taxonomía de categorías desde la DB (vía
+ * `/api/pwa-catalogos`, ya autenticado con Google). Si falla (sin login, sin
+ * red, la DB aún no está sembrada) se queda con `CATS` local — no rompe el
+ * formulario, que ya se pobló de forma síncrona en `init()`.
+ */
+async function cargarCategorias() {
+  try {
+    const cat = await getCatalogos();
+    if (cat && cat.categorias && Object.keys(cat.categorias).length) {
+      _cats = cat.categorias;
+      initCats();
+    }
+  } catch (_) {
+    // Sin login/red: seguimos con la taxonomía local ya cargada.
   }
 }
 
@@ -466,24 +490,30 @@ function onTarjetaInput(val) {
 
 function initCats() {
   const sel = V('cf-cat');
+  const prevCat = sel.value;
   sel.innerHTML = '';
-  Object.keys(CATS).forEach((c) => {
+  Object.keys(_cats).forEach((c) => {
     const o = document.createElement('option');
     o.value = o.textContent = c;
     sel.appendChild(o);
   });
+  // Si ya había una categoría elegida y sigue existiendo en la taxonomía
+  // (p. ej. tras refrescar desde la DB), la conserva en vez de resetear.
+  if (prevCat && _cats[prevCat]) sel.value = prevCat;
   fillSubs();
 }
 
 function fillSubs() {
   const cat = V('cf-cat').value;
   const sel = V('cf-sub');
+  const prevSub = sel.value;
   sel.innerHTML = '';
-  subcategorias(cat).forEach((s) => {
+  (_cats[cat] || []).forEach((s) => {
     const o = document.createElement('option');
     o.value = o.textContent = s;
     sel.appendChild(o);
   });
+  if (prevSub && (_cats[cat] || []).includes(prevSub)) sel.value = prevSub;
 }
 
 // ── Guardar en Sheets ─────────────────────────────────────

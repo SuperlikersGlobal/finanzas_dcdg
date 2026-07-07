@@ -1004,6 +1004,65 @@ export async function listAllMovimientos(sqlArg) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Config-como-datos (Fase 1.5): `categorias`/`reglas` editables sin deploy.
+// Las tablas viven en el esquema desde el motor inicial (sql/schema.sql); acá
+// se agregan las lecturas/altas. Sin UI de edición todavía — se siembran con
+// `scripts/seed-config-datos.js` y se editan con un insert directo mientras
+// tanto. Ver netlify/functions/_lib/config-datos.js para el fallback a los
+// arrays hardcodeados de app/src/config/*.js.
+// ---------------------------------------------------------------------------
+
+/** Reglas de clasificación activas, ordenadas por prioridad (menor primero). */
+export async function listReglas(sqlArg) {
+  const sql = sqlArg || await getSql();
+  return sql.query(
+    `select patron, categoria, subcategoria, metodo_pago, iwin_prestamo
+       from reglas
+      where activo
+      order by prioridad asc, id asc`,
+    []
+  );
+}
+
+/** Categorías/subcategorías activas. */
+export async function listCategorias(sqlArg) {
+  const sql = sqlArg || await getSql();
+  return sql.query('select categoria, subcategoria from categorias order by categoria, subcategoria', []);
+}
+
+/**
+ * Inserta una categoría/subcategoría nueva. Idempotente por
+ * `unique(categoria, subcategoria)` (ON CONFLICT DO NOTHING).
+ */
+export async function insertCategoria(c, sqlArg) {
+  const sql = sqlArg || await getSql();
+  const rows = await sql.query(
+    `insert into categorias (categoria, subcategoria) values ($1, $2)
+     on conflict (categoria, subcategoria) do nothing
+     returning *`,
+    [c.categoria, c.subcategoria || null]
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Inserta una regla nueva (alta simple; sin UI de edición todavía). La tabla
+ * no tiene una llave única sobre `patron` (varias reglas podrían compartir
+ * keyword), así que la idempotencia de la siembra la controla el llamador
+ * (ver `scripts/seed-config-datos.js`).
+ */
+export async function insertRegla(r, sqlArg) {
+  const sql = sqlArg || await getSql();
+  const rows = await sql.query(
+    `insert into reglas (patron, categoria, subcategoria, metodo_pago, iwin_prestamo, prioridad)
+     values ($1, $2, $3, $4, $5, $6)
+     returning *`,
+    [r.patron, r.categoria, r.subcategoria || null, r.metodo_pago || null, !!r.iwin_prestamo, r.prioridad ?? 100]
+  );
+  return rows[0];
+}
+
 /** Todos los movimientos empresa↔familia, sin filtrar (para el backup completo). */
 export async function listAllEmpresasMov(sqlArg) {
   const sql = sqlArg || await getSql();
