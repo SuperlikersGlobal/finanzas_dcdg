@@ -11,6 +11,7 @@ import {
 } from './exports.js';
 import { registrarMovimiento, resumen } from './finanzas.js';
 import { capturarCorreo } from './captura-correo.js';
+import { escanearBandeja } from './captura-scan.js';
 import {
   queryMovimientos, listEntidades, listTerceros, findOrCreateTercero,
   insertIngreso, queryIngresos, listPlanCuentas, insertPlanCuenta,
@@ -105,6 +106,30 @@ export function makeCapturarCorreoHandler() {
       const result = await capturarCorreo(body);
       if (result.registrado) await contabilizarMovSafe(result);
       return ok(result);
+    } catch (e) {
+      return bad(e.message, 422);
+    }
+  };
+}
+
+/**
+ * Handler de barrido manual de la bandeja (carril token) — para el backfill y
+ * corridas on-demand. Body: { desde: 'YYYY-MM-DD' } (opcional; por defecto 2
+ * días atrás). Lee Gmail por IMAP, registra los gastos y contabiliza; devuelve
+ * el digest completo (registrados + pendientes + contadores). Idempotente.
+ */
+export function makeCapturarScanHandler() {
+  return async (req) => {
+    if (req.method !== 'POST') return bad('Método no permitido', 405);
+    const auth = authorize(req);
+    if (!auth.ok) return auth.response;
+    const body = await parseBody(req);
+    const since = body.desde
+      ? new Date(`${body.desde}T00:00:00Z`)
+      : new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    if (Number.isNaN(since.getTime())) return bad('desde inválido (usa YYYY-MM-DD)', 400);
+    try {
+      return ok(await escanearBandeja({ since }));
     } catch (e) {
       return bad(e.message, 422);
     }
