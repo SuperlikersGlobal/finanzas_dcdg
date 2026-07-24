@@ -13,6 +13,7 @@
 import { escanearBandeja, resumirDigest, digestTexto } from './_lib/captura-scan.js';
 import { imapConfigured } from './_lib/gmail-imap.js';
 import { notificarSilvia } from './_lib/silvia-notify.js';
+import { preguntarPendientes } from './_lib/silvia-preguntar.js';
 import { env } from './_lib/env.js';
 
 const VENTANA_MS = 2 * 24 * 60 * 60 * 1000; // relee ~2 días; idempotente.
@@ -46,6 +47,15 @@ export default async () => {
     // Avisa solo si hubo novedades accionables (evita ruido horario).
     if (digest.registrados.length || digest.pendientes.length || digest.errores.length) {
       await notificarSilvia(digestTexto(digest));
+    }
+    // Pieza 4: pregunta por WhatsApp (vía SilvIA) los pendientes no identificados
+    // (v1: transferencias) a la persona dueña de la cuenta. Idempotente y
+    // best-effort: nunca tumba la corrida.
+    try {
+      const pre = await preguntarPendientes(digest.pendientes);
+      if (pre.preguntados || pre.fallidos) console.log('[captura-cron] preguntas', JSON.stringify(pre));
+    } catch (e) {
+      console.error('[captura-cron] preguntar', e.message);
     }
     return new Response(JSON.stringify({ ok: true, ...resumen }), {
       headers: { 'content-type': 'application/json' },

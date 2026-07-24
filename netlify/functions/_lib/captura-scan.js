@@ -29,13 +29,15 @@ function entradaRegistrado(r) {
   };
 }
 
-function entradaPendiente(r) {
+function entradaPendiente(r, message_id) {
   const tx = r.tx || {};
   return {
+    message_id: message_id || null,
     clase: r.pendiente,
     monto: tx.monto,
     moneda: tx.moneda || 'COP',
     cuenta: tx.cuenta || null,
+    cuenta_destino: tx.cuenta_destino || null,
     dueno: tx.dueno || null,
     remitente: tx.remitente || null,
     destino: tx.destino || null,
@@ -79,7 +81,7 @@ export async function escanearBandeja({
         }
         digest.registrados.push(entradaRegistrado(r));
       } else if (r.pendiente) {
-        digest.pendientes.push(entradaPendiente(r));
+        digest.pendientes.push(entradaPendiente(r, c.message_id));
       } else if (r.ya_existia) {
         digest.yaExistian++;
       } else {
