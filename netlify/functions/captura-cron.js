@@ -13,8 +13,22 @@
 import { escanearBandeja, resumirDigest, digestTexto } from './_lib/captura-scan.js';
 import { imapConfigured } from './_lib/gmail-imap.js';
 import { notificarSilvia } from './_lib/silvia-notify.js';
+import { env } from './_lib/env.js';
 
 const VENTANA_MS = 2 * 24 * 60 * 60 * 1000; // relee ~2 días; idempotente.
+
+/**
+ * Desde cuándo barrer. Normalmente una ventana rodante de ~2 días; si está la
+ * variable CAPTURA_BACKFILL_DESDE (YYYY-MM-DD) hace un barrido amplio de una vez
+ * (para el backfill inicial) — se quita esa variable cuando ya corrió. Puro.
+ */
+export function calcularDesde({ backfillDesde, ahora, ventanaMs = VENTANA_MS }) {
+  if (backfillDesde) {
+    const d = new Date(`${backfillDesde}T00:00:00Z`);
+    if (!Number.isNaN(d.getTime())) return { since: d, backfill: true };
+  }
+  return { since: new Date(ahora - ventanaMs), backfill: false };
+}
 
 export default async () => {
   if (!imapConfigured()) {
@@ -24,10 +38,10 @@ export default async () => {
     });
   }
 
-  const since = new Date(Date.now() - VENTANA_MS);
+  const { since, backfill } = calcularDesde({ backfillDesde: env('CAPTURA_BACKFILL_DESDE'), ahora: Date.now() });
   try {
     const digest = await escanearBandeja({ since });
-    const resumen = resumirDigest(digest);
+    const resumen = { ...resumirDigest(digest), backfill, desde: since.toISOString().slice(0, 10) };
     console.log('[captura-cron]', JSON.stringify(resumen));
     // Avisa solo si hubo novedades accionables (evita ruido horario).
     if (digest.registrados.length || digest.pendientes.length || digest.errores.length) {
