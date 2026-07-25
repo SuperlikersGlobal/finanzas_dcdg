@@ -59,6 +59,73 @@ function cuerpoDe(parsed) {
  * los filtros de Gmail sacan del INBOX (típico con los avisos del banco). Cae a
  * INBOX si no encuentra la carpeta.
  */
+/**
+ * Diagnóstico READ-ONLY de la captura por correo: conecta al IMAP, lista las
+ * carpetas, resuelve la de "Todos los correos", y busca correos del banco en los
+ * últimos `dias`. Reporta cada paso y CUALQUIER error (login, carpeta, búsqueda)
+ * como texto, sin registrar nada. Sirve para saber POR QUÉ no captura cuando no
+ * podemos leer los logs de producción.
+ */
+export async function diagnosticoImap({ dias = 5 } = {}) {
+  const rep = {
+    configurado: imapConfigured(),
+    user: env('GMAIL_IMAP_USER', null),
+    host: env('GMAIL_IMAP_HOST', 'imap.gmail.com'),
+    mailbox_env: env('GMAIL_IMAP_MAILBOX', null),
+    conecta: false,
+    mailbox_usada: null,
+    carpetas: [],
+    remitentes: REMITENTES_BANCO,
+    ventana_dias: dias,
+    total_encontrados: 0,
+    muestra: [],
+    error: null,
+  };
+  if (!rep.configurado) { rep.error = 'Faltan GMAIL_IMAP_USER / GMAIL_IMAP_PASSWORD en el entorno.'; return rep; }
+
+  const { ImapFlow } = await import('imapflow');
+  const { simpleParser } = await import('mailparser');
+  const client = new ImapFlow(imapOpts());
+  try {
+    await client.connect();
+    rep.conecta = true;
+    try {
+      const lista = await client.list();
+      rep.carpetas = (lista || []).map((m) => ({ path: m.path, specialUse: m.specialUse || null }));
+    } catch (e) { rep.carpetas_error = e.message; }
+
+    const mailbox = await resolverMailbox(client);
+    rep.mailbox_usada = mailbox;
+    await client.mailboxOpen(mailbox, { readOnly: true });
+
+    const since = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+    for (const sender of REMITENTES_BANCO) {
+      let uids = [];
+      try {
+        uids = await client.search({ from: sender, since }, { uid: true });
+      } catch (e) { rep.muestra.push({ sender, error: e.message }); continue; }
+      rep.total_encontrados += uids.length;
+      for (const uid of uids.slice(-4)) {
+        try {
+          const msg = await client.fetchOne(uid, { source: true }, { uid: true });
+          const parsed = await simpleParser(msg.source);
+          rep.muestra.push({
+            sender,
+            from: (parsed.from && parsed.from.text) || sender,
+            subject: parsed.subject || '',
+            fecha: parsed.date ? new Date(parsed.date).toISOString().slice(0, 10) : null,
+          });
+        } catch (e) { rep.muestra.push({ sender, uid, error: e.message }); }
+      }
+    }
+  } catch (e) {
+    rep.error = e.message; // aquí sale el fallo de login IMAP (App Password / Workspace).
+  } finally {
+    try { await client.logout(); } catch (_) { /* best-effort */ }
+  }
+  return rep;
+}
+
 export async function resolverMailbox(client) {
   const explicito = env('GMAIL_IMAP_MAILBOX', null);
   if (explicito) return explicito;
