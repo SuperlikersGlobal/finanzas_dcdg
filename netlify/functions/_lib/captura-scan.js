@@ -22,6 +22,17 @@ import { parseNotificacion } from './email-parse.js';
  * es de reconocimiento (cuerpo vacío, formato no soportado, exclusión iWin) vs.
  * de registro. `limit` bajo para no exceder el timeout de la función.
  */
+// Extrae el fragmento "de la transacción" del cuerpo (para diagnosticar por qué
+// un correo se descarta): una ventana alrededor del primer verbo bancario o del
+// primer "$". Colapsa espacios.
+function snippetTx(body = '') {
+  const t = String(body).replace(/\s+/g, ' ').trim();
+  const kw = t.search(/(Compraste|Pagaste|Transferiste|Retiraste|Recibiste|Aprob|Se aprob|Rechaz|realizaste|c[oó]digo OTP|clave|Bre-B|estado de cuenta|QR)/i);
+  const dollar = t.indexOf('$');
+  const i = kw >= 0 ? kw : (dollar >= 0 ? dollar : 0);
+  return t.slice(Math.max(0, i - 15), i + 160);
+}
+
 export async function diagnosticoParseo({ dias = 4, limit = 20, fetcher = fetchCorreosBancarios } = {}) {
   const since = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
   const correos = await fetcher({ since, limit });
@@ -34,7 +45,7 @@ export async function diagnosticoParseo({ dias = 4, limit = 20, fetcher = fetchC
     if (r.skip) {
       resumen.skip++;
       skips[r.skip] = (skips[r.skip] || 0) + 1;
-      detalle.push({ from: c.from, body_len, resultado: 'skip', motivo: r.skip });
+      detalle.push({ from: c.from, body_len, resultado: 'skip', motivo: r.skip, snippet: snippetTx(c.body) });
     } else if (r.clase) {
       resumen[r.clase] = (resumen[r.clase] || 0) + 1;
       detalle.push({
