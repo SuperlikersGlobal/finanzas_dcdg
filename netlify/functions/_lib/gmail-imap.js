@@ -51,16 +51,38 @@ function cuerpoDe(parsed) {
  * Message-ID. `mailbox` por defecto INBOX; para un backfill que incluya correos
  * archivados, apuntar a "[Gmail]/All Mail" vía GMAIL_IMAP_MAILBOX.
  */
+/**
+ * Carpeta IMAP a leer. Si `GMAIL_IMAP_MAILBOX` viene en el env, se respeta. Si
+ * no, se busca la carpeta "Todos los correos" de Gmail por su flag de uso
+ * especial `\All` (su nombre está localizado: "[Gmail]/All Mail", "[Gmail]/Todos
+ * los mensajes", …). Así se incluyen los correos ARCHIVADOS o con etiqueta que
+ * los filtros de Gmail sacan del INBOX (típico con los avisos del banco). Cae a
+ * INBOX si no encuentra la carpeta.
+ */
+export async function resolverMailbox(client) {
+  const explicito = env('GMAIL_IMAP_MAILBOX', null);
+  if (explicito) return explicito;
+  try {
+    const lista = await client.list();
+    const todos = (lista || []).find((m) => m && m.specialUse === '\\All');
+    if (todos && todos.path) return todos.path;
+  } catch (e) {
+    console.error('[gmail-imap] list', e.message);
+  }
+  return 'INBOX';
+}
+
 export async function fetchCorreosBancarios({ since, senders = REMITENTES_BANCO, limit = 300 } = {}) {
   const { ImapFlow } = await import('imapflow');
   const { simpleParser } = await import('mailparser');
-  const mailbox = env('GMAIL_IMAP_MAILBOX', 'INBOX');
   const client = new ImapFlow(imapOpts());
   const out = [];
   const vistos = new Set();
 
   await client.connect();
+  let mailbox = 'INBOX';
   try {
+    mailbox = await resolverMailbox(client);
     await client.mailboxOpen(mailbox, { readOnly: true });
     for (const sender of senders) {
       const criterio = { from: sender };
