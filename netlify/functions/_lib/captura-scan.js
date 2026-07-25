@@ -14,6 +14,40 @@
 import { fetchCorreosBancarios } from './gmail-imap.js';
 import { capturarCorreo } from './captura-correo.js';
 import { contabilizarMovimiento } from './contabilizar.js';
+import { parseNotificacion } from './email-parse.js';
+
+/**
+ * Diagnóstico de PARSEO (sin DB, sin LLM): trae los correos y corre el parser en
+ * cada uno para ver qué reconoce y qué descarta (y por qué). Revela si el fallo
+ * es de reconocimiento (cuerpo vacío, formato no soportado, exclusión iWin) vs.
+ * de registro. `limit` bajo para no exceder el timeout de la función.
+ */
+export async function diagnosticoParseo({ dias = 4, limit = 20, fetcher = fetchCorreosBancarios } = {}) {
+  const since = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+  const correos = await fetcher({ since, limit });
+  const resumen = { total: correos.length, gasto: 0, ingreso: 0, transferencia: 0, skip: 0, otro: 0 };
+  const skips = {};
+  const detalle = [];
+  for (const c of correos) {
+    const r = parseNotificacion({ from: c.from, subject: c.subject, body: c.body }) || {};
+    const body_len = (c.body || '').length;
+    if (r.skip) {
+      resumen.skip++;
+      skips[r.skip] = (skips[r.skip] || 0) + 1;
+      detalle.push({ from: c.from, body_len, resultado: 'skip', motivo: r.skip });
+    } else if (r.clase) {
+      resumen[r.clase] = (resumen[r.clase] || 0) + 1;
+      detalle.push({
+        from: c.from, body_len, resultado: r.clase, monto: r.monto,
+        cuenta: r.cuenta || null, comercio: r.comercio || r.destino || r.remitente || null, dueno: r.dueno || null,
+      });
+    } else {
+      resumen.otro++;
+      detalle.push({ from: c.from, body_len, resultado: 'otro' });
+    }
+  }
+  return { since: since.toISOString().slice(0, 10), limite: limit, resumen, skips, detalle };
+}
 
 function entradaRegistrado(r) {
   const tx = r.tx || {};
