@@ -33,9 +33,9 @@ function snippetTx(body = '') {
   return t.slice(Math.max(0, i - 15), i + 160);
 }
 
-export async function diagnosticoParseo({ dias = 4, limit = 20, fetcher = fetchCorreosBancarios } = {}) {
+export async function diagnosticoParseo({ dias = 4, limit = 20, newest = true, fetcher = fetchCorreosBancarios } = {}) {
   const since = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
-  const correos = await fetcher({ since, limit });
+  const correos = await fetcher({ since, limit, newest });
   const resumen = { total: correos.length, gasto: 0, ingreso: 0, transferencia: 0, skip: 0, otro: 0 };
   const skips = {};
   const detalle = [];
@@ -58,6 +58,28 @@ export async function diagnosticoParseo({ dias = 4, limit = 20, fetcher = fetchC
     }
   }
   return { since: since.toISOString().slice(0, 10), limite: limit, resumen, skips, detalle };
+}
+
+/**
+ * Diagnóstico de REGISTRO: corre el pipeline real (`escanearBandeja`) sobre los
+ * `limit` correos más recientes y devuelve el digest — para probar de punta a
+ * punta que la captura registra (independiente del cron). SÍ escribe en la DB
+ * (idempotente). `limit` bajo para no exceder el timeout de la función.
+ */
+export async function diagnosticoScan({ dias = 3, limit = 12 } = {}) {
+  const since = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+  const digest = await escanearBandeja({
+    since,
+    fetcher: ({ since: s }) => fetchCorreosBancarios({ since: s, limit, newest: true }),
+  });
+  return {
+    since: since.toISOString().slice(0, 10),
+    limite: limit,
+    resumen: resumirDigest(digest),
+    registrados: digest.registrados.slice(0, 20),
+    pendientes: digest.pendientes.slice(0, 20),
+    errores: digest.errores.slice(0, 10),
+  };
 }
 
 function entradaRegistrado(r) {
