@@ -22,6 +22,10 @@ test('parseMontoCOP: estilo colombiano y plano', () => {
   assert.equal(parseMontoCOP('$7,091,298.00'), 7091298);
   assert.equal(parseMontoCOP('$110,000'), 110000);
   assert.equal(parseMontoCOP(''), null);
+  // Basura → null, NUNCA NaN (un NaN contamina las sumas del resumen → "$0").
+  assert.equal(parseMontoCOP('$'), null);
+  assert.equal(parseMontoCOP('abc'), null);
+  assert.equal(parseMontoCOP('.,'), null);
 });
 
 test('parseMontoUS: estilo US de DolarApp', () => {

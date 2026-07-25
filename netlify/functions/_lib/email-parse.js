@@ -64,7 +64,8 @@ export function parseMontoCOP(str) {
     // solo punto: miles si son grupos de 3 ("785.000"); decimal si no ("1161300.00").
     if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
   }
-  return Number(s);
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null; // nunca devolver NaN (contaminaría sumas).
 }
 
 /** Monto estilo US (DolarApp): "12,919,288" (coma=miles), "3899.99" (punto=decimal). */

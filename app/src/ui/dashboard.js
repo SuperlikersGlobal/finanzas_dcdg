@@ -125,6 +125,15 @@ function tipoGastoLabel(m) {
   return '';
 }
 
+/** De dónde salió el movimiento: 📧 automático (correo del banco) vs 💬/📱 reportado. */
+function origenLabel(m) {
+  const o = String(m.origen || '').toLowerCase();
+  if (o.includes('correo')) return '📧 Automático';
+  if (o.includes('silvia')) return '💬 SilvIA';
+  if (o.includes('app')) return '📱 App';
+  return o ? '✍️ Reportado' : '';
+}
+
 function movsHTML(movs, owner) {
   if (!movs || !movs.length) return '<div class="empty">Sin movimientos en este periodo</div>';
   return movs.map((m) => {
@@ -133,8 +142,9 @@ function movsHTML(movs, owner) {
       ? `<button class="sec-link mov-fix" data-mov-id="${esc(m.id)}" style="margin-top:4px">Corregir</button>`
       : '';
     const tg = tipoGastoLabel(m);
+    const og = origenLabel(m);
     return `<div class="h-item">
-      <div><div class="h-name">${esc(m.descripcion)}</div><div class="h-meta">${esc(m.categoria || '—')}${m.subcategoria ? ' · ' + esc(m.subcategoria) : ''} · ${esc(fecha)}${tg ? ' · ' + esc(tg) : ''}</div>${fix}</div>
+      <div><div class="h-name">${esc(m.descripcion)}</div><div class="h-meta">${esc(m.categoria || '—')}${m.subcategoria ? ' · ' + esc(m.subcategoria) : ''} · ${esc(fecha)}${tg ? ' · ' + esc(tg) : ''}${og ? ' · ' + esc(og) : ''}</div>${fix}</div>
       <div><div class="h-amt">${esc(formatMoneda(Number(m.monto) || 0, m.moneda))}</div><div class="h-who">${esc(m.quien_pago || '')}${m.metodo_pago ? ' · ' + esc(m.metodo_pago) : ''}</div></div>
     </div>`;
   }).join('');

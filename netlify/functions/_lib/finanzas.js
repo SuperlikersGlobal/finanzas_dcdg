@@ -65,7 +65,9 @@ export async function registrarMovimiento(mov = {}) {
   }
 
   const monto = parseMonto(mov.monto);
-  if (monto == null || monto <= 0) throw new Error('monto inválido o ausente');
+  // OJO: NaN <= 0 es `false`, así que sin el chequeo de finitud un monto NaN
+  // se colaría y contaminaría las sumas del resumen (total → NaN → "$0").
+  if (monto == null || !Number.isFinite(monto) || monto <= 0) throw new Error('monto inválido o ausente');
   const moneda = String(mov.moneda || 'COP').toUpperCase() === 'USD' ? 'USD' : 'COP';
 
   // Una TRANSFERENCIA entre cuentas propias NO es un gasto: no se clasifica, no

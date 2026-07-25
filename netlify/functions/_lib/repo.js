@@ -237,7 +237,11 @@ export async function queryResumen({ desde, hasta, categoria, quien }, sqlArg) {
   const params = [desde, hasta];
   // Excluye transferencias (no son gasto), anulados, y limita el total a COP (no
   // se mezclan monedas). Los movimientos en USD se ven en la lista, no en el total.
-  let filtro = "fecha >= $1 and fecha <= $2 and coalesce(tipo,'gasto') <> 'transferencia' and coalesce(moneda,'COP') = 'COP' and not coalesce(anulado,false)";
+  // `coalesce(monto::text,'') <> 'NaN'` excluye filas con monto NaN (basura de un
+  // mal parseo anterior): en SQL, un solo NaN vuelve NaN toda la suma → el total
+  // salía "$0". Type-agnostic (numeric o float8). Se prevé el origen del NaN en
+  // registrarMovimiento/parseMontoCOP, pero esto protege el resumen igual.
+  let filtro = "fecha >= $1 and fecha <= $2 and coalesce(tipo,'gasto') <> 'transferencia' and coalesce(moneda,'COP') = 'COP' and not coalesce(anulado,false) and coalesce(monto::text,'') <> 'NaN'";
   if (categoria) { params.push(`%${categoria.toLowerCase()}%`); filtro += ` and lower(categoria) like $${params.length}`; }
   if (quien) { params.push(`%${quien.toLowerCase()}%`); filtro += ` and lower(coalesce(quien_pago,'')) like $${params.length}`; }
   const agg = await sql.query(
