@@ -10,6 +10,7 @@
  */
 import { diagnosticoImap } from './_lib/gmail-imap.js';
 import { diagnosticoParseo, diagnosticoScan } from './_lib/captura-scan.js';
+import { resumen } from './_lib/finanzas.js';
 import { requireEnv } from './_lib/env.js';
 
 export default async (req) => {
@@ -41,6 +42,15 @@ export default async (req) => {
     if (url.searchParams.get('scan')) {
       const limit = Math.min(25, Math.max(1, Number(url.searchParams.get('limit')) || 12));
       const rep = await diagnosticoScan({ dias: Math.min(dias, 7), limit });
+      return new Response(JSON.stringify(rep, null, 2), {
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      });
+    }
+    // ?resumen=1 → devuelve el resumen del backend TAL CUAL (total + por_categoria
+    // completo) para ver si el "$0" viene del servidor o de un frontend viejo en
+    // caché. ?periodo=mes | YYYY-MM | YYYY-MM-DD..YYYY-MM-DD.
+    if (url.searchParams.get('resumen')) {
+      const rep = await resumen({ periodo: url.searchParams.get('periodo') || 'mes' });
       return new Response(JSON.stringify(rep, null, 2), {
         headers: { 'content-type': 'application/json; charset=utf-8' },
       });
