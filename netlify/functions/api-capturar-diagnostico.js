@@ -11,6 +11,7 @@
 import { diagnosticoImap } from './_lib/gmail-imap.js';
 import { diagnosticoParseo, diagnosticoScan } from './_lib/captura-scan.js';
 import { resumen } from './_lib/finanzas.js';
+import { renombrarCategoria, anularMontosNaN } from './_lib/repo.js';
 import { requireEnv } from './_lib/env.js';
 
 export default async (req) => {
@@ -40,9 +41,19 @@ export default async (req) => {
     // más recientes, y devuelve el digest. Para probar el registro de punta a
     // punta, independiente del cron.
     if (url.searchParams.get('scan')) {
-      const limit = Math.min(25, Math.max(1, Number(url.searchParams.get('limit')) || 12));
-      const rep = await diagnosticoScan({ dias: Math.min(dias, 7), limit });
+      const limit = Math.min(30, Math.max(1, Number(url.searchParams.get('limit')) || 12));
+      const desde = url.searchParams.get('desde') || undefined; // YYYY-MM-DD (opcional)
+      const hasta = url.searchParams.get('hasta') || undefined; // YYYY-MM-DD (inclusivo)
+      const rep = await diagnosticoScan({ desde, hasta, dias: Math.min(dias, 7), limit });
       return new Response(JSON.stringify(rep, null, 2), {
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      });
+    }
+    // ?limpiar=1 → mantenimiento: unifica la categoría duplicada y anula filas NaN.
+    if (url.searchParams.get('limpiar')) {
+      const renombradas = await renombrarCategoria('Gastos Luhijo-Luciano', 'Gastos Luhijo - Luciano');
+      const nanAnuladas = await anularMontosNaN();
+      return new Response(JSON.stringify({ ok: true, categoria_renombradas: renombradas, nan_anuladas: nanAnuladas }, null, 2), {
         headers: { 'content-type': 'application/json; charset=utf-8' },
       });
     }

@@ -139,7 +139,7 @@ export async function resolverMailbox(client) {
   return 'INBOX';
 }
 
-export async function fetchCorreosBancarios({ since, senders = REMITENTES_BANCO, limit = 300, newest = false } = {}) {
+export async function fetchCorreosBancarios({ since, before, senders = REMITENTES_BANCO, limit = 300, newest = false } = {}) {
   const { ImapFlow } = await import('imapflow');
   const { simpleParser } = await import('mailparser');
   const client = new ImapFlow(imapOpts());
@@ -154,6 +154,7 @@ export async function fetchCorreosBancarios({ since, senders = REMITENTES_BANCO,
     for (const sender of senders) {
       const criterio = { from: sender };
       if (since) criterio.since = since;
+      if (before) criterio.before = before; // ventana [since, before) para backfill por chunks.
       let uids = [];
       try {
         uids = await client.search(criterio, { uid: true });

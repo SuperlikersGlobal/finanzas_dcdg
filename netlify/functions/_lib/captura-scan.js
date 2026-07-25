@@ -66,18 +66,18 @@ export async function diagnosticoParseo({ dias = 4, limit = 20, newest = true, f
  * punta que la captura registra (independiente del cron). SÍ escribe en la DB
  * (idempotente). `limit` bajo para no exceder el timeout de la función.
  */
-export async function diagnosticoScan({ dias = 3, limit = 12 } = {}) {
-  const since = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
-  const digest = await escanearBandeja({
-    since,
-    fetcher: ({ since: s }) => fetchCorreosBancarios({ since: s, limit, newest: true }),
-  });
+export async function diagnosticoScan({ desde, hasta, dias = 3, limit = 12 } = {}) {
+  const since = desde ? new Date(desde + 'T00:00:00Z') : new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+  // `before` es exclusivo en IMAP → +1 día para que `hasta` sea inclusivo.
+  const before = hasta ? new Date(new Date(hasta + 'T00:00:00Z').getTime() + 24 * 60 * 60 * 1000) : undefined;
+  const digest = await escanearBandeja({ since, before, limit, newest: true });
   return {
-    since: since.toISOString().slice(0, 10),
+    desde: since.toISOString().slice(0, 10),
+    hasta: hasta || null,
     limite: limit,
     resumen: resumirDigest(digest),
-    registrados: digest.registrados.slice(0, 20),
-    pendientes: digest.pendientes.slice(0, 20),
+    registrados: digest.registrados.slice(0, 25),
+    pendientes: digest.pendientes.slice(0, 25),
     errores: digest.errores.slice(0, 10),
   };
 }
@@ -122,12 +122,12 @@ function entradaPendiente(r, message_id) {
  * @param {func}   [opts.contabilizar] contabiliza un movimiento por id (idem).
  */
 export async function escanearBandeja({
-  since,
+  since, before, limit, newest,
   fetcher = fetchCorreosBancarios,
   capturar = capturarCorreo,
   contabilizar = contabilizarMovimiento,
 } = {}) {
-  const correos = await fetcher({ since });
+  const correos = await fetcher({ since, before, limit, newest });
   const digest = {
     total: correos.length,
     registrados: [],

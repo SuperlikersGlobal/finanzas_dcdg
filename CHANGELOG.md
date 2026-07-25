@@ -9,6 +9,8 @@ El formato: fecha · qué se añadió · PR · estado (✅ en firme / 🔎 en re
 ---
 
 ## 2026-07-25
+- **Backfill por ventanas de fecha** (`?scan=1&desde=&hasta=`) + `fetchCorreosBancarios({before})`: permite rellenar julio en chunks seguros sin saturar el cron de timeout corto (el naive traía cientos de correos de negocio en orden viejo→nuevo).
+- **Mantenimiento de datos** (`?limpiar=1`): unifica la categoría "Gastos Luhijo-Luciano" → "Gastos Luhijo - Luciano" y anula (borrado suave) las filas con monto NaN. `repo.js`: renombrarCategoria + anularMontosNaN.
 - **Nueva pantalla "Movimientos"** (aparte del Panel): lista detallada y filtrable por **persona** (toda la familia / Luis / Caro), periodo, categoría y texto, con total de lo filtrado. En Más › Movimientos.
 - **Drill-down desde el Panel**: tocar una **categoría** o el **total** abre Movimientos ya filtrado. El Panel también gana filtro por persona (Todos/Luis/Caro).
 - **Fix "$0" del Panel: montos NaN contaminaban el total**. Filas con `monto = NaN` (de un mal parseo) hacían que `sum(monto)` diera NaN → `Number(NaN)||0` → total "$0" (y las categorías afectadas salían `null`, ordenadas primero). Arreglo en 3 capas: `parseMontoCOP` nunca devuelve NaN (basura → null); `registrarMovimiento` rechaza montos no finitos (`Number.isFinite`); y `queryResumen` excluye filas NaN (`monto::text <> 'NaN'`) para que el total sea robusto ante datos viejos. + tests.
