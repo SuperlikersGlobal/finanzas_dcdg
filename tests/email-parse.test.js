@@ -16,6 +16,11 @@ test('parseMontoCOP: estilo colombiano y plano', () => {
   assert.equal(parseMontoCOP('$50.000'), 50000);
   assert.equal(parseMontoCOP('$1.234.567'), 1234567);
   assert.equal(parseMontoCOP('$110.000'), 110000);
+  // Formato US (negocios/PSE de Bancolombia): coma=miles, punto=decimal.
+  assert.equal(parseMontoCOP('$37,804,000.00'), 37804000);
+  assert.equal(parseMontoCOP('$145,000.00'), 145000);
+  assert.equal(parseMontoCOP('$7,091,298.00'), 7091298);
+  assert.equal(parseMontoCOP('$110,000'), 110000);
   assert.equal(parseMontoCOP(''), null);
 });
 

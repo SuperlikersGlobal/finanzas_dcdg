@@ -139,7 +139,7 @@ export async function resolverMailbox(client) {
   return 'INBOX';
 }
 
-export async function fetchCorreosBancarios({ since, senders = REMITENTES_BANCO, limit = 300 } = {}) {
+export async function fetchCorreosBancarios({ since, senders = REMITENTES_BANCO, limit = 300, newest = false } = {}) {
   const { ImapFlow } = await import('imapflow');
   const { simpleParser } = await import('mailparser');
   const client = new ImapFlow(imapOpts());
@@ -161,6 +161,9 @@ export async function fetchCorreosBancarios({ since, senders = REMITENTES_BANCO,
         console.error('[gmail-imap] search', sender, e.message);
         continue;
       }
+      // `search` devuelve UIDs ascendentes (más viejos primero). Para diagnósticos
+      // que quieren lo RECIENTE, se invierte antes de aplicar el límite.
+      if (newest) uids = [...uids].reverse();
       for (const uid of uids) {
         if (out.length >= limit) break;
         let msg;

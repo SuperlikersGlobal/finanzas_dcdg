@@ -9,7 +9,7 @@
  * OJO: el token da acceso; trata la URL como sensible (no la compartas).
  */
 import { diagnosticoImap } from './_lib/gmail-imap.js';
-import { diagnosticoParseo } from './_lib/captura-scan.js';
+import { diagnosticoParseo, diagnosticoScan } from './_lib/captura-scan.js';
 import { requireEnv } from './_lib/env.js';
 
 export default async (req) => {
@@ -31,6 +31,16 @@ export default async (req) => {
     if (url.searchParams.get('parse')) {
       const limit = Math.min(60, Math.max(1, Number(url.searchParams.get('limit')) || 20));
       const rep = await diagnosticoParseo({ dias: Math.min(dias, 7), limit });
+      return new Response(JSON.stringify(rep, null, 2), {
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      });
+    }
+    // ?scan=1 → corre el pipeline real (REGISTRA en la DB) sobre los N correos
+    // más recientes, y devuelve el digest. Para probar el registro de punta a
+    // punta, independiente del cron.
+    if (url.searchParams.get('scan')) {
+      const limit = Math.min(25, Math.max(1, Number(url.searchParams.get('limit')) || 12));
+      const rep = await diagnosticoScan({ dias: Math.min(dias, 7), limit });
       return new Response(JSON.stringify(rep, null, 2), {
         headers: { 'content-type': 'application/json; charset=utf-8' },
       });

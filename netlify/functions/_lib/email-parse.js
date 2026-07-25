@@ -46,15 +46,24 @@ export function cuentaInfo(last4) {
  * o plano "1161300.00" / "749000". Con coma → la coma es el decimal.
  */
 export function parseMontoCOP(str) {
-  const s = String(str == null ? '' : str).replace(/[^\d.,]/g, '');
+  let s = String(str == null ? '' : str).replace(/[^\d.,]/g, '');
   if (!s) return null;
-  // Con coma → la coma es el decimal; los puntos son separadores de miles.
-  if (s.includes(',')) return Number(s.replace(/\./g, '').replace(',', '.'));
-  // Sin coma: si son grupos de miles ("785.000", "1.234.567"), el punto es
-  // separador de miles (formato colombiano) → quitarlo. OJO: JS interpreta
-  // "785.000" como 785 (punto = decimal), de ahí el bug si no se normaliza.
-  if (/^\d{1,3}(\.\d{3})+$/.test(s)) return Number(s.replace(/\./g, ''));
-  // Resto: entero plano ("749000") o decimal explícito ("1161300.00").
+  const hasComma = s.includes(',');
+  const hasDot = s.includes('.');
+  // Bancolombia MEZCLA formatos: personal "$50.000,00" (punto=miles, coma=decimal)
+  // y negocios/PSE "$37,804,000.00" (coma=miles, punto=decimal). Se desambigua
+  // por cuál separador aparece de ÚLTIMO (ese es el decimal).
+  if (hasComma && hasDot) {
+    s = s.lastIndexOf(',') > s.lastIndexOf('.')
+      ? s.replace(/\./g, '').replace(',', '.') // CO: 50.000,00 → 50000.00
+      : s.replace(/,/g, '');                   // US: 37,804,000.00 → 37804000.00
+  } else if (hasComma) {
+    // solo coma: miles si son grupos de 3 ("110,000"), decimal si no ("9,50").
+    s = /^\d{1,3}(,\d{3})+$/.test(s) ? s.replace(/,/g, '') : s.replace(',', '.');
+  } else if (hasDot) {
+    // solo punto: miles si son grupos de 3 ("785.000"); decimal si no ("1161300.00").
+    if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+  }
   return Number(s);
 }
 
