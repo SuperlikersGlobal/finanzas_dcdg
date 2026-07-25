@@ -26,6 +26,7 @@ import { formatCOP, hoyISO } from './utils/formatters.js';
 import { monedaDeCuenta, tasaTransferencia } from './utils/transferencia-monedas.js';
 import { loadHistory, addHistory, getHistory, clearHistory } from './services/history.js';
 import { renderDashboard } from './ui/dashboard.js';
+import { renderMovimientos, movClearCat, setFiltroMovimientos } from './ui/movimientos.js';
 import { renderHome } from './ui/home.js';
 import { renderIngresos } from './ui/ingresos.js';
 import { renderExtractos } from './ui/extractos.js';
@@ -88,6 +89,7 @@ function go(s) {
   if (s === 'history') renderH();
   if (s === 'cet') initCET();
   if (s === 'dash') renderDashboard();
+  if (s === 'movimientos') renderMovimientos();
   if (s === 'ingreso') renderIngresos();
   if (s === 'transfer') initTransfer();
   if (s === 'extractos') renderExtractos();
@@ -829,9 +831,14 @@ async function registrarTransfer() {
 const ACTIONS = {
   saveSetup, saveCfg, resetAll, signOut, doText, submit,
   abrirMailCET, registrarCET, clearHist, registrarTransfer,
+  movClearCat,
   trigCam: () => V('cam-in').click(),
   trigGal: () => V('gal-in').click(),
 };
+
+// Navegación programática + fijar filtro (para drill-down del Panel a Movimientos).
+window.__nav = go;
+window.__movFiltro = setFiltroMovimientos;
 
 function wireEvents() {
   document.addEventListener('click', (e) => {

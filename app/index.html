@@ -80,6 +80,10 @@ html,body{height:100%;font-family:var(--font-body);background:var(--bg);color:va
 .scr.on{display:flex}
 .scr-ttl{font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-.6px;color:var(--ink);margin:2px 0 -2px}
 .scr-sub{font-size:13px;color:var(--muted);margin-top:-8px}
+.mov-chip{display:inline-flex;align-items:center;gap:6px;background:var(--card,#1b1b1b);border:1px solid var(--line,#333);border-radius:999px;padding:5px 10px;font-size:13px;margin:8px 0}
+.mov-chip-x{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0 2px}
+.dash-cat-row{cursor:pointer}
+.dash-cat-row:active{opacity:.6}
 
 /* ---- CARDS ---- */
 .card{background:var(--surface);border-radius:var(--r);padding:20px;box-shadow:var(--sh);border:1px solid var(--border)}
@@ -466,6 +470,15 @@ html,body{height:100%;font-family:var(--font-body);background:var(--bg);color:va
   <div id="dash-seg"></div>
   <div id="dash-body"></div>
   <button class="btn btn-s" data-go="home">← Volver</button>
+</div>
+
+<!-- ── MOVIMIENTOS (lista detallada y filtrable) ── -->
+<div class="scr" id="scr-movimientos">
+  <div class="scr-ttl">Movimientos</div>
+  <div class="scr-sub">Todos los gastos de la familia — filtra por persona, periodo o categoría</div>
+  <div id="mov-filtros" style="margin-top:12px"></div>
+  <div id="mov-body" style="margin-top:12px"></div>
+  <button class="btn btn-s" data-go="dash">← Volver al Panel</button>
 </div>
 
 <!-- ── TRANSFERENCIA ── -->
@@ -1194,6 +1207,7 @@ html,body{height:100%;font-family:var(--font-body);background:var(--bg);color:va
   <div class="scr-ttl">Más</div>
   <div class="mas-group">
     <div class="mas-group-ttl">Movimientos</div>
+    <button class="mas-item" data-go="movimientos"><div class="mas-ico">📃</div><div class="mas-txt"><strong>Ver movimientos</strong><span>Lista filtrable por persona y categoría</span></div></button>
     <button class="mas-item" data-go="ingreso"><div class="mas-ico">💵</div><div class="mas-txt"><strong>Ingresos</strong><span>Registrar un ingreso</span></div></button>
     <button class="mas-item" data-go="transfer"><div class="mas-ico">🔁</div><div class="mas-txt"><strong>Transferencia</strong><span>Entre cuentas propias</span></div></button>
   </div>

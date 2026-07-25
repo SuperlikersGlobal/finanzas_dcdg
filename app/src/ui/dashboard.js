@@ -23,6 +23,7 @@ const PALETTE = ['#2E5FA3', '#0F6E56', '#F0A500', '#534AB7', '#C0392B', '#1A7A4A
 
 let _wired = false;
 let _periodo = 'mes';
+let _quien = ''; // '' = toda la familia | 'Luis' | 'Carolina'
 
 const pad = (n) => String(n).padStart(2, '0');
 const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -83,6 +84,13 @@ function segHTML() {
     `<button class="seg-btn${k === _periodo ? ' on' : ''}" data-per="${k}">${l}</button>`).join('')}</div>`;
 }
 
+// Filtro por persona (toda la familia / Luis / Caro). El backend filtra por quien_pago.
+function segPersonaHTML() {
+  const opts = [['', 'Todos'], ['Luis', 'Luis'], ['Carolina', 'Caro']];
+  return `<div class="seg" style="margin-top:8px">${opts.map(([k, l]) =>
+    `<button class="seg-btn${k === _quien ? ' on' : ''}" data-quien="${k}">${l}</button>`).join('')}</div>`;
+}
+
 /** HTML del indicador de variación (▲/▼ + %). `compact` omite el sufijo "vs. …". */
 export function variacionHTML(actual, anterior, { compact = false, sufijo = '' } = {}) {
   const pct = variacionPct(actual, anterior);
@@ -103,8 +111,8 @@ function barsHTML(porCategoria, porCategoriaAnterior) {
     const pct = Math.max(2, Math.round((monto / max) * 100));
     const color = PALETTE[i % PALETTE.length];
     const varHtml = prevMap.has(c.categoria) ? variacionHTML(monto, prevMap.get(c.categoria), { compact: true }) : '';
-    return `<div class="bar-row">
-      <div class="bar-head"><span class="bar-cat">${esc(c.categoria)}</span><span class="bar-amt">${esc(c.monto_fmt || formatCOP(monto))} ${varHtml}</span></div>
+    return `<div class="bar-row dash-cat-row" data-cat="${esc(c.categoria)}" title="Ver movimientos de ${esc(c.categoria)}">
+      <div class="bar-head"><span class="bar-cat">${esc(c.categoria)} ›</span><span class="bar-amt">${esc(c.monto_fmt || formatCOP(monto))} ${varHtml}</span></div>
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
     </div>`;
   }).join('');
@@ -160,20 +168,21 @@ async function load() {
   const anterior = periodRangeAnterior(_periodo);
   const periodo = `${desde}..${hasta}`;
   const periodoAnterior = `${anterior.desde}..${anterior.hasta}`;
+  const q = _quien ? { quien: _quien } : {};
   try {
     const [res, movsRes, resAnterior] = await Promise.all([
-      getResumen({ periodo }),
-      getMovimientos({ desde, hasta, limit: 20 }),
-      getResumen({ periodo: periodoAnterior }),
+      getResumen({ periodo, ...q }),
+      getMovimientos({ desde, hasta, limit: 20, ...q }),
+      getResumen({ periodo: periodoAnterior, ...q }),
     ]);
     const total = Number(res.total) || 0;
     const totalAnterior = Number(resAnterior.total) || 0;
     const varTotal = variacionHTML(total, totalAnterior, { sufijo: ` vs. ${esc(anterior.label)}` });
     V('dash-body').innerHTML = `
-      <div class="card dash-total-card">
-        <div class="dash-total-lbl">${esc(label)}</div>
+      <div class="card dash-total-card dash-total-open" title="Ver todos los movimientos">
+        <div class="dash-total-lbl">${esc(label)}${_quien ? ' · ' + esc(_quien) : ''}</div>
         <div class="dash-total">${esc(res.total_fmt || formatCOP(total))}</div>
-        <div class="dash-total-sub">${res.movimientos || 0} movimiento${res.movimientos === 1 ? '' : 's'}${varTotal ? ` · ${varTotal}` : ''}</div>
+        <div class="dash-total-sub">${res.movimientos || 0} movimiento${res.movimientos === 1 ? '' : 's'}${varTotal ? ` · ${varTotal}` : ''} · toca para ver ›</div>
       </div>
       <div class="card">
         <div class="card-ttl">Por categoría</div>
@@ -226,7 +235,7 @@ async function corregir(id) {
 /** Llamado por main.js al navegar a la pantalla del dashboard. */
 export function renderDashboard() {
   const sel = V('dash-seg');
-  if (sel) sel.innerHTML = segHTML();
+  if (sel) sel.innerHTML = segHTML() + segPersonaHTML();
   if (!_wired) {
     _wired = true;
     const scr = V('scr-dash');
@@ -234,8 +243,27 @@ export function renderDashboard() {
       const per = e.target.closest('[data-per]');
       if (per) {
         _periodo = per.dataset.per;
-        scr.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('on', b.dataset.per === _periodo));
+        per.parentElement.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('on', b === per));
         load();
+        return;
+      }
+      const qb = e.target.closest('[data-quien]');
+      if (qb) {
+        _quien = qb.dataset.quien;
+        qb.parentElement.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('on', b === qb));
+        load();
+        return;
+      }
+      // Drill-down: categoría o total → pantalla Movimientos con el filtro puesto.
+      const cat = e.target.closest('.dash-cat-row');
+      if (cat) {
+        if (window.__movFiltro) window.__movFiltro({ categoria: cat.dataset.cat, quien: _quien, periodo: _periodo });
+        if (window.__nav) window.__nav('movimientos');
+        return;
+      }
+      if (e.target.closest('.dash-total-open')) {
+        if (window.__movFiltro) window.__movFiltro({ categoria: '', quien: _quien, periodo: _periodo });
+        if (window.__nav) window.__nav('movimientos');
         return;
       }
       const fx = e.target.closest('.mov-fix');

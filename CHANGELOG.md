@@ -9,6 +9,8 @@ El formato: fecha · qué se añadió · PR · estado (✅ en firme / 🔎 en re
 ---
 
 ## 2026-07-25
+- **Nueva pantalla "Movimientos"** (aparte del Panel): lista detallada y filtrable por **persona** (toda la familia / Luis / Caro), periodo, categoría y texto, con total de lo filtrado. En Más › Movimientos.
+- **Drill-down desde el Panel**: tocar una **categoría** o el **total** abre Movimientos ya filtrado. El Panel también gana filtro por persona (Todos/Luis/Caro).
 - **Fix "$0" del Panel: montos NaN contaminaban el total**. Filas con `monto = NaN` (de un mal parseo) hacían que `sum(monto)` diera NaN → `Number(NaN)||0` → total "$0" (y las categorías afectadas salían `null`, ordenadas primero). Arreglo en 3 capas: `parseMontoCOP` nunca devuelve NaN (basura → null); `registrarMovimiento` rechaza montos no finitos (`Number.isFinite`); y `queryResumen` excluye filas NaN (`monto::text <> 'NaN'`) para que el total sea robusto ante datos viejos. + tests.
 - **Panel: etiqueta de origen** en cada movimiento (📧 Automático / 💬 SilvIA / 📱 App / ✍️ Reportado) para distinguir lo captado por el sistema de lo reportado por Luis/Caro.
 - **Fix parseo de montos: Bancolombia mezcla formatos CO y US**. Personal usa "$50.000,00" (punto=miles, coma=decimal); negocios/PSE usan "$37,804,000.00" (coma=miles, punto=decimal). `parseMontoCOP` ahora desambigua por el separador que aparece de último (ese es el decimal) y maneja miles con un solo separador. Antes truncaba (110/785 en vez de 110.000/785.000). + tests CO y US.
