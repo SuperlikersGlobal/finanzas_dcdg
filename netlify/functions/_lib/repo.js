@@ -185,6 +185,33 @@ export async function anularMovimiento(id, motivo, sqlArg) {
   return rows[0] || null;
 }
 
+// ── Mantenimiento de datos ───────────────────────────────────────────────────
+
+/** Unifica una categoría escrita distinto (p. ej. "Gastos Luhijo-Luciano" →
+ *  "Gastos Luhijo - Luciano"). Devuelve cuántas filas se renombraron. */
+export async function renombrarCategoria(desde, hacia, sqlArg) {
+  const sql = sqlArg || await getSql();
+  const rows = await sql.query(
+    `update movimientos set categoria = $2, actualizado_en = now()
+      where categoria = $1 and not coalesce(anulado,false)
+      returning id`, [desde, hacia]);
+  return rows.length;
+}
+
+/** Anula (borrado suave) las filas con monto inválido (NaN) — basura de un mal
+ *  parseo anterior que contaminaba las sumas. Devuelve cuántas se anularon. */
+export async function anularMontosNaN(sqlArg) {
+  const sql = sqlArg || await getSql();
+  await ensureCorreccionSchema(sql);
+  const rows = await sql.query(
+    `update movimientos
+        set anulado = true, anulado_en = now(),
+            anulado_motivo = 'monto inválido (NaN) — limpieza automática', actualizado_en = now()
+      where coalesce(monto::text,'') = 'NaN' and not coalesce(anulado,false)
+      returning id`);
+  return rows.length;
+}
+
 /** Actualiza los campos editables de un movimiento (recategorizar). */
 export async function updateMovimientoCampos(id, campos, sqlArg) {
   const sql = sqlArg || await getSql();
