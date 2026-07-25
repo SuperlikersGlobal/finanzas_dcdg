@@ -9,6 +9,7 @@
  * OJO: el token da acceso; trata la URL como sensible (no la compartas).
  */
 import { diagnosticoImap } from './_lib/gmail-imap.js';
+import { diagnosticoParseo } from './_lib/captura-scan.js';
 import { requireEnv } from './_lib/env.js';
 
 export default async (req) => {
@@ -25,6 +26,15 @@ export default async (req) => {
   }
   const dias = Math.min(60, Math.max(1, Number(url.searchParams.get('dias')) || 5));
   try {
+    // ?parse=1 → corre el parser sobre los correos hallados (sin escribir en DB)
+    // para ver qué reconoce y qué descarta.
+    if (url.searchParams.get('parse')) {
+      const limit = Math.min(60, Math.max(1, Number(url.searchParams.get('limit')) || 20));
+      const rep = await diagnosticoParseo({ dias: Math.min(dias, 7), limit });
+      return new Response(JSON.stringify(rep, null, 2), {
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      });
+    }
     const rep = await diagnosticoImap({ dias });
     return new Response(JSON.stringify(rep, null, 2), {
       headers: { 'content-type': 'application/json; charset=utf-8' },
