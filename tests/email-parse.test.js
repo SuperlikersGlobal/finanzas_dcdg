@@ -11,6 +11,11 @@ test('parseMontoCOP: estilo colombiano y plano', () => {
   assert.equal(parseMontoCOP('$3.301.580,70'), 3301580.7);
   assert.equal(parseMontoCOP('$1161300.00'), 1161300); // plano con punto decimal
   assert.equal(parseMontoCOP('$749000'), 749000);
+  // Miles con punto SIN decimal (formato Bancolombia): no truncar a 785.
+  assert.equal(parseMontoCOP('$785.000'), 785000);
+  assert.equal(parseMontoCOP('$50.000'), 50000);
+  assert.equal(parseMontoCOP('$1.234.567'), 1234567);
+  assert.equal(parseMontoCOP('$110.000'), 110000);
   assert.equal(parseMontoCOP(''), null);
 });
 

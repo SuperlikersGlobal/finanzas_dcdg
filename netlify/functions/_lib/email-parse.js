@@ -48,7 +48,13 @@ export function cuentaInfo(last4) {
 export function parseMontoCOP(str) {
   const s = String(str == null ? '' : str).replace(/[^\d.,]/g, '');
   if (!s) return null;
+  // Con coma → la coma es el decimal; los puntos son separadores de miles.
   if (s.includes(',')) return Number(s.replace(/\./g, '').replace(',', '.'));
+  // Sin coma: si son grupos de miles ("785.000", "1.234.567"), el punto es
+  // separador de miles (formato colombiano) → quitarlo. OJO: JS interpreta
+  // "785.000" como 785 (punto = decimal), de ahí el bug si no se normaliza.
+  if (/^\d{1,3}(\.\d{3})+$/.test(s)) return Number(s.replace(/\./g, ''));
+  // Resto: entero plano ("749000") o decimal explícito ("1161300.00").
   return Number(s);
 }
 
