@@ -8,6 +8,36 @@ El formato: fecha · qué se añadió · PR · estado (✅ en firme / 🔎 en re
 
 ---
 
+## 2026-07-27 (autobuild, corrida nueva)
+- 🔎 **Sin item elegible — cola sin novedad de Luis, gap de la rutina programada
+  otra vez de ~7 días.** Reconfirmé la cola `autobuild` desde cero:
+  - `#40`, `#41`, `#92` siguen con `autobuild-espera` y su PR borrador
+    (`#58`, `#55`, `#96`) sin comentario nuevo de Luis — ya **20 días**
+    esperando revisión (creados 07-07/07-08).
+  - `#52` sigue siendo el issue "padre" ya dividido (`#91` fusionado, `#92`
+    en espera con PR abierto); tomarlo directo duplicaría ese trabajo. Su
+    dependencia (T5 `#48`) sigue fusionada en `main`.
+  - Cero issues `propuesta` abiertos → no propongo una funcionalidad nueva
+    mientras esas tres siguen sin revisión.
+  - El PR de Autofix `#211` sigue en borrador sin comentario nuevo (**15
+    días**).
+  - **Limpieza de proceso**: el PR `#229` (registro de la corrida del
+    2026-07-20, que ya documentaba este mismo hallazgo y un gap de 7 días)
+    quedó **7 días sin fusionarse pese a CI verde y ser solo-documentación**
+    — un cambio así debía auto-mergearse según `AUTOBUILD.md` §7. Para
+    cuando esta corrida lo revisó ya tenía conflicto de merge con `main`
+    (por el trabajo de captura por correo, PR #230-#241), así que lo cerré
+    sin fusionar y dejo su contenido incorporado aquí.
+  - Van ya **dos corridas seguidas** (07-20 y esta) separadas por ~7 días en
+    vez de la cadencia de ~3 horas que describe `AUTOBUILD.md` — y una de
+    ellas con un PR verde que nadie fusionó. Vale la pena que Luis revise el
+    disparador programado (cron) de esta rutina y, si sigue así, considere
+    fusionar PRs de solo-CHANGELOG en cuanto salgan en vez de esperar a que
+    una corrida futura lo note.
+  `AUTOBUILD_NOTIFY_URL`/`AUTOBUILD_NOTIFY_SECRET` no están en el entorno de
+  esta corrida — aviso queda aquí y por la notificación de la rutina
+  (push/email) que sí tengo disponible en esta sesión.
+
 ## 2026-07-25
 - **Backfill por ventanas de fecha** (`?scan=1&desde=&hasta=`) + `fetchCorreosBancarios({before})`: permite rellenar julio en chunks seguros sin saturar el cron de timeout corto (el naive traía cientos de correos de negocio en orden viejo→nuevo).
 - **Mantenimiento de datos** (`?limpiar=1`): unifica la categoría "Gastos Luhijo-Luciano" → "Gastos Luhijo - Luciano" y anula (borrado suave) las filas con monto NaN. `repo.js`: renombrarCategoria + anularMontosNaN.
