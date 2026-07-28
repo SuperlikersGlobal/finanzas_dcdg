@@ -39,6 +39,9 @@ El formato: fecha · qué se añadió · PR · estado (✅ en firme / 🔎 en re
   (push/email) que sí tengo disponible en esta sesión.
 
 ## 2026-07-25
+- **Fix bug de moneda USD (recibos Delca2/AutohausAZ/Xenon)**: `registrarMovimiento` ahora INFIERE `moneda=USD` de la cuenta/tarjeta usada (Mercury Delca2 7730, DollarApp, TC iWin son cuentas USD) cuando el llamador no manda `moneda` explícita. Antes una compra en dólares pagada con la TC 7730 quedaba como "$126 COP". Nuevo helper `monedaDeCuenta()` en accounts.js. Los movimientos USD ya se veían en la lista y se excluían del total COP (repo.js:271); ahora quedan con la etiqueta correcta y dejan de contaminar el total.
+
+## 2026-07-25
 - **Backfill por ventanas de fecha** (`?scan=1&desde=&hasta=`) + `fetchCorreosBancarios({before})`: permite rellenar julio en chunks seguros sin saturar el cron de timeout corto (el naive traía cientos de correos de negocio en orden viejo→nuevo).
 - **Mantenimiento de datos** (`?limpiar=1`): unifica la categoría "Gastos Luhijo-Luciano" → "Gastos Luhijo - Luciano" y anula (borrado suave) las filas con monto NaN. `repo.js`: renombrarCategoria + anularMontosNaN.
 - **Nueva pantalla "Movimientos"** (aparte del Panel): lista detallada y filtrable por **persona** (toda la familia / Luis / Caro), periodo, categoría y texto, con total de lo filtrado. En Más › Movimientos.
