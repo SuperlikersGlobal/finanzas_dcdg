@@ -212,6 +212,32 @@ export async function anularMontosNaN(sqlArg) {
   return rows.length;
 }
 
+/** Reetiqueta a USD los movimientos (no transferencias) pagados con una cuenta
+ *  en dólares (Mercury Delca2 7730, DollarApp, TC iWin) que quedaron marcados
+ *  como COP antes del fix de inferencia de moneda. Devuelve las filas corregidas. */
+export async function reetiquetarMonedaUSD(sqlArg) {
+  const sql = sqlArg || await getSql();
+  const rows = await sql.query(
+    `update movimientos
+        set moneda = 'USD', actualizado_en = now()
+      where coalesce(moneda,'COP') <> 'USD'
+        and not coalesce(anulado,false)
+        and coalesce(tipo,'gasto') <> 'transferencia'
+        and (
+             coalesce(tarjeta,'') = '7730'
+          or metodo_pago ilike '%7730%'
+          or metodo_pago ilike '%delca2%'
+          or metodo_pago ilike '%mercury%'
+          or metodo_pago ilike '%dollarapp%'
+          or metodo_pago ilike '%dolar app%'
+          or metodo_pago ilike '%jeeves%'
+          or metodo_pago ilike '%superlikers%'
+          or metodo_pago ilike '%iwin%'
+        )
+      returning id, fecha, descripcion, monto, metodo_pago`);
+  return rows;
+}
+
 /** Actualiza los campos editables de un movimiento (recategorizar). */
 export async function updateMovimientoCampos(id, campos, sqlArg) {
   const sql = sqlArg || await getSql();
