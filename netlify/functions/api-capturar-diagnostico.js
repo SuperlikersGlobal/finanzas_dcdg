@@ -11,7 +11,7 @@
 import { diagnosticoImap } from './_lib/gmail-imap.js';
 import { diagnosticoParseo, diagnosticoScan } from './_lib/captura-scan.js';
 import { resumen } from './_lib/finanzas.js';
-import { renombrarCategoria, anularMontosNaN, corregirMonedaCuentasUSD, diagBuscarMovimientos } from './_lib/repo.js';
+import { renombrarCategoria, anularMontosNaN, corregirMonedaCuentasUSD, diagBuscarMovimientos, updateMovimientoCampos } from './_lib/repo.js';
 import { requireEnv } from './_lib/env.js';
 
 export default async (req) => {
@@ -40,6 +40,17 @@ export default async (req) => {
     // ?scan=1 → corre el pipeline real (REGISTRA en la DB) sobre los N correos
     // más recientes, y devuelve el digest. Para probar el registro de punta a
     // punta, independiente del cron.
+    // ?corregir_fecha=<id>:<YYYY-MM-DD> → fija la fecha de un movimiento (arreglar
+    // un año mal inferido por SilvIA, p. ej. 2025 en vez de 2026).
+    if (url.searchParams.get('corregir_fecha')) {
+      const [idStr, fecha] = String(url.searchParams.get('corregir_fecha')).split(':');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha || '')) return new Response(JSON.stringify({ ok: false, error: 'usa corregir_fecha=<id>:YYYY-MM-DD' }), { status: 400, headers: { 'content-type': 'application/json' } });
+      const row = await updateMovimientoCampos(Number(idStr), { fecha });
+      return new Response(JSON.stringify({ ok: true, corregido: row ? { id: row.id, fecha: row.fecha, descripcion: row.descripcion } : null }, null, 2), {
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      });
+    }
+
     // ?buscar=<texto> → lista movimientos que coincidan (incluye anulados), para
     // depurar por qué algo "registrado" no aparece en el Panel.
     if (url.searchParams.get('buscar')) {
