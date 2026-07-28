@@ -11,7 +11,7 @@
 import { diagnosticoImap } from './_lib/gmail-imap.js';
 import { diagnosticoParseo, diagnosticoScan } from './_lib/captura-scan.js';
 import { resumen } from './_lib/finanzas.js';
-import { renombrarCategoria, anularMontosNaN, corregirMonedaCuentasUSD } from './_lib/repo.js';
+import { renombrarCategoria, anularMontosNaN, corregirMonedaCuentasUSD, diagBuscarMovimientos } from './_lib/repo.js';
 import { requireEnv } from './_lib/env.js';
 
 export default async (req) => {
@@ -40,6 +40,15 @@ export default async (req) => {
     // ?scan=1 → corre el pipeline real (REGISTRA en la DB) sobre los N correos
     // más recientes, y devuelve el digest. Para probar el registro de punta a
     // punta, independiente del cron.
+    // ?buscar=<texto> → lista movimientos que coincidan (incluye anulados), para
+    // depurar por qué algo "registrado" no aparece en el Panel.
+    if (url.searchParams.get('buscar')) {
+      const rows = await diagBuscarMovimientos(url.searchParams.get('buscar'));
+      return new Response(JSON.stringify({ ok: true, n: rows.length, movimientos: rows }, null, 2), {
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      });
+    }
+
     if (url.searchParams.get('scan')) {
       const limit = Math.min(30, Math.max(1, Number(url.searchParams.get('limit')) || 12));
       const desde = url.searchParams.get('desde') || undefined; // YYYY-MM-DD (opcional)

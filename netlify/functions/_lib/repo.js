@@ -212,6 +212,21 @@ export async function anularMontosNaN(sqlArg) {
   return rows.length;
 }
 
+/** Diagnóstico: busca movimientos por texto en descripción o método de pago,
+ *  INCLUYENDO anulados, para depurar "lo registré pero no aparece". */
+export async function diagBuscarMovimientos(texto, sqlArg) {
+  const sql = sqlArg || await getSql();
+  const q = `%${String(texto || '').toLowerCase()}%`;
+  const rows = await sql.query(
+    `select id, fecha, descripcion, monto, moneda, metodo_pago, tipo, origen,
+            coalesce(anulado,false) as anulado, anulado_motivo, creado_en
+       from movimientos
+      where lower(descripcion) like $1 or lower(coalesce(metodo_pago,'')) like $1
+      order by creado_en desc
+      limit 25`, [q]);
+  return rows;
+}
+
 /** Corrige la moneda de los movimientos pagados con cuentas en dólares (Mercury
  *  Delca2 7730, DollarApp, TC iWin). Regla: el peso colombiano no tiene centavos,
  *  así que un monto FRACCIONARIO = USD y uno ENTERO = COP (esas cuentas también
