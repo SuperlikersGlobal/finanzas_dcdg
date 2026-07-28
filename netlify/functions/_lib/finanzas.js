@@ -34,6 +34,7 @@ import { cuentaPorTarjeta, monedaDeCuenta } from '../../../app/src/config/accoun
 import {
   parseMonto,
   normalizarFecha,
+  corregirAnioProbable,
   mesDeISO,
   ultimos4,
   formatCOP,
@@ -123,7 +124,7 @@ export async function registrarMovimiento(mov = {}) {
     return { ok: true, registrado: false, motivo: evalMov.motivo, tipo, monto };
   }
 
-  const fecha = normalizarFecha(mov.fecha);
+  const fecha = corregirAnioProbable(normalizarFecha(mov.fecha));
   const origen = String(mov.origen || 'SilvIA');
   const titular = String(mov.quien_pago || '').trim() || 'Luis';
 
@@ -249,7 +250,7 @@ export async function registrarMovimiento(mov = {}) {
 async function registrarTransferencia(mov) {
   const monto = mov.monto;
   const moneda = mov.moneda === 'USD' ? 'USD' : 'COP';
-  const fecha = normalizarFecha(mov.fecha);
+  const fecha = corregirAnioProbable(normalizarFecha(mov.fecha));
   const origen = String(mov.origen || 'App');
   const titular = String(mov.quien_pago || '').trim() || 'Luis';
   const cuentaOrigen = String(mov.cuenta_origen || mov.metodo_pago || '').trim();

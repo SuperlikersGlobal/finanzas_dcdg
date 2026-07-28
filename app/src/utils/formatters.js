@@ -75,6 +75,27 @@ export function normalizarFecha(input, anioRef = new Date().getFullYear()) {
   return hoyISO();
 }
 
+/**
+ * Corrige un "año off-by-one" en fechas de recibos SIN año explícito: si un
+ * comercio dice "27 de jul" y el lector (SilvIA) infiere mal el año, la fecha
+ * cae ~1 año en el pasado (p. ej. 2025-07-27 registrado el 2026-07-28). Solo se
+ * corrige la ventana estrecha ~1 año atrás cuya versión +1 año NO queda en el
+ * futuro; una compra genuinamente vieja (varios meses) NO se toca.
+ */
+export function corregirAnioProbable(iso, hoy = new Date()) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  if (!m) return iso;
+  const DIA = 86400000;
+  const f = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const hoyUTC = Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const diasAtras = (hoyUTC - f) / DIA;
+  if (diasAtras >= 300 && diasAtras <= 430) {
+    const masUno = Date.UTC(Number(m[1]) + 1, Number(m[2]) - 1, Number(m[3]));
+    if (masUno <= hoyUTC + 2 * DIA) return `${Number(m[1]) + 1}-${m[2]}-${m[3]}`;
+  }
+  return iso;
+}
+
 /** Extrae el número de mes (1-12) de una fecha ISO. */
 export function mesDeISO(iso) {
   const m = /^\d{4}-(\d{2})-\d{2}$/.exec(String(iso || ''));
