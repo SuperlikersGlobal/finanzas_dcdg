@@ -11,7 +11,7 @@
 import { diagnosticoImap } from './_lib/gmail-imap.js';
 import { diagnosticoParseo, diagnosticoScan } from './_lib/captura-scan.js';
 import { resumen } from './_lib/finanzas.js';
-import { renombrarCategoria, anularMontosNaN, reetiquetarMonedaUSD } from './_lib/repo.js';
+import { renombrarCategoria, anularMontosNaN, corregirMonedaCuentasUSD } from './_lib/repo.js';
 import { requireEnv } from './_lib/env.js';
 
 export default async (req) => {
@@ -53,13 +53,14 @@ export default async (req) => {
     if (url.searchParams.get('limpiar')) {
       const renombradas = await renombrarCategoria('Gastos Luhijo-Luciano', 'Gastos Luhijo - Luciano');
       const nanAnuladas = await anularMontosNaN();
-      const usdCorregidos = await reetiquetarMonedaUSD();
+      const usd = await corregirMonedaCuentasUSD();
       return new Response(JSON.stringify({
         ok: true,
         categoria_renombradas: renombradas,
         nan_anuladas: nanAnuladas,
-        usd_reetiquetados: usdCorregidos.length,
-        usd_detalle: usdCorregidos.map((r) => ({ fecha: r.fecha, descripcion: r.descripcion, monto: r.monto, cuenta: r.metodo_pago })),
+        usd_revertidos_a_cop: usd.revertidos,
+        usd_reetiquetados: usd.marcados.length,
+        usd_detalle: usd.marcados.map((r) => ({ fecha: r.fecha, descripcion: r.descripcion, monto: r.monto, cuenta: r.metodo_pago })),
       }, null, 2), {
         headers: { 'content-type': 'application/json; charset=utf-8' },
       });

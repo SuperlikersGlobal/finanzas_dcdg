@@ -212,17 +212,16 @@ export async function anularMontosNaN(sqlArg) {
   return rows.length;
 }
 
-/** Reetiqueta a USD los movimientos (no transferencias) pagados con una cuenta
- *  en dólares (Mercury Delca2 7730, DollarApp, TC iWin) que quedaron marcados
- *  como COP antes del fix de inferencia de moneda. Devuelve las filas corregidas. */
-export async function reetiquetarMonedaUSD(sqlArg) {
+/** Corrige la moneda de los movimientos pagados con cuentas en dólares (Mercury
+ *  Delca2 7730, DollarApp, TC iWin). Regla: el peso colombiano no tiene centavos,
+ *  así que un monto FRACCIONARIO = USD y uno ENTERO = COP (esas cuentas también
+ *  gastan en pesos en comercios locales). Auto-corrige (idempotente): revierte a
+ *  COP lo que se marcó USD por error y marca USD solo los montos con centavos. */
+export async function corregirMonedaCuentasUSD(sqlArg) {
   const sql = sqlArg || await getSql();
-  const rows = await sql.query(
-    `update movimientos
-        set moneda = 'USD', actualizado_en = now()
-      where coalesce(moneda,'COP') <> 'USD'
-        and not coalesce(anulado,false)
+  const base = `not coalesce(anulado,false)
         and coalesce(tipo,'gasto') <> 'transferencia'
+        and coalesce(monto::text,'') <> 'NaN'
         and (
              coalesce(tarjeta,'') = '7730'
           or metodo_pago ilike '%7730%'
@@ -233,9 +232,18 @@ export async function reetiquetarMonedaUSD(sqlArg) {
           or metodo_pago ilike '%jeeves%'
           or metodo_pago ilike '%superlikers%'
           or metodo_pago ilike '%iwin%'
-        )
+        )`;
+  // 1) Revertir a COP lo marcado USD por error: montos enteros = pesos.
+  const revertidos = await sql.query(
+    `update movimientos set moneda = 'COP', actualizado_en = now()
+      where moneda = 'USD' and ${base} and monto::numeric = trunc(monto::numeric)
+      returning id`);
+  // 2) Marcar USD solo los montos con centavos (fraccionarios).
+  const marcados = await sql.query(
+    `update movimientos set moneda = 'USD', actualizado_en = now()
+      where coalesce(moneda,'COP') <> 'USD' and ${base} and monto::numeric <> trunc(monto::numeric)
       returning id, fecha, descripcion, monto, metodo_pago`);
-  return rows;
+  return { revertidos: revertidos.length, marcados };
 }
 
 /** Actualiza los campos editables de un movimiento (recategorizar). */
