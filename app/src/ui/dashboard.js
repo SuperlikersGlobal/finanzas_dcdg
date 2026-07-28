@@ -43,9 +43,14 @@ export function periodRange(key, hoy = new Date()) {
     const fin = new Date(hoy.getFullYear(), 11, 31);
     return { desde: iso(ini), hasta: iso(fin), label: String(hoy.getFullYear()) };
   }
-  // mes en curso (default)
+  // mes en curso (default): hasta FIN DE MES, no `hoy`. Si no, un movimiento
+  // fechado más adelante en el mes queda oculto — p. ej. un recibo que SilvIA
+  // marcó en UTC y cae "mañana" por la diferencia horaria (Colombia UTC−5),
+  // como AutohausAZ 2026-07-28 que no salía estando el visor en el 27. Mismo
+  // criterio que 'mespasado'/'anio'.
   const ini = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-  return { desde: iso(ini), hasta: iso(hoy), label: 'Este mes' };
+  const fin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+  return { desde: iso(ini), hasta: iso(fin), label: 'Este mes' };
 }
 
 /** Devuelve el rango equivalente del periodo INMEDIATAMENTE ANTERIOR al seleccionado. */
