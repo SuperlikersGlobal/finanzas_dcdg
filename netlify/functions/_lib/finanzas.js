@@ -30,7 +30,7 @@ import { inferirTipoGasto } from './tipo-gasto.js';
 import { deriveIdempotencyKey } from './idempotency.js';
 import { clasificar } from './classify.js';
 import { evaluarMovimiento } from '../../../app/src/config/iwin.js';
-import { cuentaPorTarjeta } from '../../../app/src/config/accounts.js';
+import { cuentaPorTarjeta, monedaDeCuenta } from '../../../app/src/config/accounts.js';
 import {
   parseMonto,
   normalizarFecha,
@@ -68,7 +68,16 @@ export async function registrarMovimiento(mov = {}) {
   // OJO: NaN <= 0 es `false`, así que sin el chequeo de finitud un monto NaN
   // se colaría y contaminaría las sumas del resumen (total → NaN → "$0").
   if (monto == null || !Number.isFinite(monto) || monto <= 0) throw new Error('monto inválido o ausente');
-  const moneda = String(mov.moneda || 'COP').toUpperCase() === 'USD' ? 'USD' : 'COP';
+  // Moneda: explícita si viene; si no, se INFIERE de la cuenta/tarjeta usada
+  // (Mercury Delca2 7730, DollarApp, TC iWin son cuentas USD) para no marcar
+  // como COP una compra en dólares (bug del recibo AutohausAZ/Xenon: "$126 COP"
+  // en vez de "US$126"). Cae a COP si no se puede determinar.
+  const monedaExplicita = mov.moneda != null && String(mov.moneda).trim() !== '';
+  let moneda = String(mov.moneda || '').toUpperCase() === 'USD' ? 'USD' : 'COP';
+  if (!monedaExplicita) {
+    const inferida = monedaDeCuenta({ metodo_pago: mov.metodo_pago, tarjeta_ultimos4: mov.tarjeta_ultimos4 });
+    if (inferida) moneda = inferida;
+  }
 
   // Una TRANSFERENCIA entre cuentas propias NO es un gasto: no se clasifica, no
   // aplica reglas iWin/Delca2 y NO cuenta en los totales de gasto. Se maneja aparte.

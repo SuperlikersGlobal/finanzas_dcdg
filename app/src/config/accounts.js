@@ -53,6 +53,36 @@ export function cuentaPorNombre(nombre) {
   return CUENTAS.find((c) => c.nombre.toLowerCase() === n) || null;
 }
 
+/**
+ * Infiere la MONEDA ('USD' | 'COP') de la cuenta/tarjeta usada, para no marcar
+ * como COP una compra pagada con una cuenta en dólares (Mercury Delca2 7730,
+ * DollarApp, TC iWin) cuando el llamador no manda `moneda` explícita. Devuelve
+ * null si no se puede determinar (el llamador cae a su default).
+ */
+export function monedaDeCuenta({ metodo_pago, tarjeta_ultimos4 } = {}) {
+  // 1) Por últimos 4 explícitos de la tarjeta.
+  const t = tarjeta_ultimos4 ? String(tarjeta_ultimos4).replace(/\D/g, '').slice(-4) : '';
+  if (t) {
+    const c = cuentaPorTarjeta(t);
+    if (c && c.moneda) return c.moneda;
+  }
+  const s = String(metodo_pago || '').trim();
+  if (s) {
+    // 2) Por nombre canónico de cuenta.
+    const porNombre = cuentaPorNombre(s);
+    if (porNombre && porNombre.moneda) return porNombre.moneda;
+    // 3) Por 4 dígitos embebidos en el texto (p. ej. "TC 7730 Delca2").
+    const m = s.match(/\d{4}/);
+    if (m) {
+      const c = cuentaPorTarjeta(m[0]);
+      if (c && c.moneda) return c.moneda;
+    }
+    // 4) Por palabras clave de cuentas USD (última red de seguridad).
+    if (/delca2|mercury|dollarapp|dolar\s*app|jeeves|superlikers|corporativ/i.test(s)) return 'USD';
+  }
+  return null;
+}
+
 /** Lista de nombres de cuentas activas (para selects y prompts). */
 export const NOMBRES_CUENTAS = CUENTAS.map((c) => c.nombre);
 
