@@ -68,15 +68,19 @@ export async function registrarMovimiento(mov = {}) {
   // OJO: NaN <= 0 es `false`, así que sin el chequeo de finitud un monto NaN
   // se colaría y contaminaría las sumas del resumen (total → NaN → "$0").
   if (monto == null || !Number.isFinite(monto) || monto <= 0) throw new Error('monto inválido o ausente');
-  // Moneda: explícita si viene; si no, se INFIERE de la cuenta/tarjeta usada
-  // (Mercury Delca2 7730, DollarApp, TC iWin son cuentas USD) para no marcar
-  // como COP una compra en dólares (bug del recibo AutohausAZ/Xenon: "$126 COP"
-  // en vez de "US$126"). Cae a COP si no se puede determinar.
+  // Moneda: explícita si viene; si no, se INFIERE. El peso colombiano NO tiene
+  // centavos, así que un monto FRACCIONARIO pagado con una cuenta en dólares
+  // (Mercury Delca2 7730, DollarApp, TC iWin) es una compra en USD (bug del
+  // recibo AutohausAZ US$125.90 / Xenon US$119.98 que caía a "$126 COP"). OJO:
+  // esas mismas cuentas también gastan en COP en comercios locales (montos
+  // ENTEROS: Olímpica $18.191, TAQUI $40.000) y esos NO se tocan. Una moneda
+  // explícita del llamador siempre manda.
   const monedaExplicita = mov.moneda != null && String(mov.moneda).trim() !== '';
   let moneda = String(mov.moneda || '').toUpperCase() === 'USD' ? 'USD' : 'COP';
-  if (!monedaExplicita) {
-    const inferida = monedaDeCuenta({ metodo_pago: mov.metodo_pago, tarjeta_ultimos4: mov.tarjeta_ultimos4 });
-    if (inferida) moneda = inferida;
+  if (!monedaExplicita
+      && Number.isFinite(monto) && Math.round(monto) !== monto
+      && monedaDeCuenta({ metodo_pago: mov.metodo_pago, tarjeta_ultimos4: mov.tarjeta_ultimos4 }) === 'USD') {
+    moneda = 'USD';
   }
 
   // Una TRANSFERENCIA entre cuentas propias NO es un gasto: no se clasifica, no
