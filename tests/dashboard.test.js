@@ -16,6 +16,13 @@ test('periodRangeAnterior: mes pasado → dos meses atrás completo', () => {
   assert.equal(r.hasta, '2026-05-31');
 });
 
+test('periodRange: mes en curso → hasta FIN DE MES, no hoy (no oculta movimientos fechados adelante)', () => {
+  const hoy = new Date(2026, 6, 15); // 2026-07-15
+  const r = periodRange('mes', hoy);
+  assert.equal(r.desde, '2026-07-01');
+  assert.equal(r.hasta, '2026-07-31'); // incluye p. ej. un recibo fechado 07-28 por desfase UTC
+});
+
 test('periodRange: año → cubre todo el año calendario (incluye meses futuros)', () => {
   const hoy = new Date(2026, 6, 9); // 2026-07-09
   const r = periodRange('anio', hoy);
