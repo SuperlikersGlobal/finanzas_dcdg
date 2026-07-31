@@ -27,3 +27,9 @@ valida el mismo `SILVIA_FINANZAS_PREGUNTA_SECRET` (respaldo `AUTOBUILD_NOTIFY_SE
 `GET /api/capturar-diagnostico?token=<DCDG_API_TOKEN>&preguntar=1&desde=YYYY-MM-DD&hasta=YYYY-MM-DD`
 escanea la ventana y dispara las preguntas; devuelve `detalle` con `{a, clase,
 monto, enviado, motivo}` por pendiente para ver si llegó o por qué falló.
+
+## Nota operativa
+
+Las env vars de este carril deben ponerse como variable **normal** (no "secret")
+con scope de funciones; si se marcan como secret no llegan al runtime de las
+funciones. Tras cambiarlas, **redeploy** del sitio para que las tome.
