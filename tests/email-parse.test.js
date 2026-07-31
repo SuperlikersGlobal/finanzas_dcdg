@@ -139,3 +139,22 @@ test('marketing de DolarApp → se descarta', () => {
   const r = parseNotificacion({ from: 'no-reply@arqfinance.com', subject: 'Invita a tus amigos y gana $30 USDc', body: '¿Tienes amigos que viajen?' });
   assert.equal(r.skip, 'ruido/seguridad');
 });
+
+// --- Transferencias salientes a cuenta externa (bug: "* 47800002087" con espacio) ---
+test('transferencia a cuenta externa con espacio tras el asterisco → no se pierde', () => {
+  const from = '"Alertas" <alertasynotificaciones@an.notificacionesbancolombia.com>';
+  const r = parseNotificacion({ from, body: 'Bancolombia: Transferiste $6,205,876 desde tu cuenta *0965 a la cuenta * 47800002087 el 30/07/2026 a las 22:30.' });
+  assert.equal(r.skip, undefined);
+  assert.equal(r.clase, 'transferencia');
+  assert.equal(r.monto, 6205876);
+  assert.equal(r.cuenta, '0965');
+});
+
+test('transferencia por llave (Bre-B) → transferencia con destino nombrado', () => {
+  const from = '"Alertas" <alertasynotificaciones@an.notificacionesbancolombia.com>';
+  const r = parseNotificacion({ from, body: 'Bancolombia: LUIS, transferiste $830,000.00 a la llave @edgardo107 desde tu cuenta *0965 a EDGARDO ENRIQUE GUTIERREZ DAZA el 29/07/26 a las 15:41.' });
+  assert.equal(r.skip, undefined);
+  assert.equal(r.clase, 'transferencia');
+  assert.equal(r.monto, 830000);
+  assert.equal(r.destino, 'EDGARDO ENRIQUE GUTIERREZ DAZA');
+});

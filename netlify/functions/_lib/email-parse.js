@@ -136,14 +136,16 @@ function parseBancolombia(texto) {
       comercio: m[2].trim(), cuenta: c4, ...owner(c4), fecha: parseFechaBanco(texto), fuente: 'bancolombia' };
   }
   // Transferencia con destino nombrado por llave: "...transferiste $X a la llave YYY desde tu cuenta *NNNN a DESTINO el ..."
-  m = texto.match(/transferiste\s+\$([\d.,]+)\s+a\s+la\s+llave\s+\S+\s+desde\s+tu\s+cuenta\s+\*?(\d+)\s+a\s+(.+?)\s+el\s+(\d{2}\/\d{2}\/\d{2,4})/i);
+  // OJO: `\*?\s*` tolera el espacio tras el asterisco que Bancolombia mete a veces ("* 47800002087").
+  m = texto.match(/transferiste\s+\$([\d.,]+)\s+a\s+la\s+llave\s+\S+\s+desde\s+tu\s+cuenta\s+\*?\s*(\d+)\s+a\s+(.+?)\s+el\s+(\d{2}\/\d{2}\/\d{2,4})/i);
   if (m) {
     const c4 = ultimos4(m[2]);
     return { clase: 'transferencia', direccion: 'salida', monto: parseMontoCOP(m[1]), moneda: 'COP',
       cuenta: c4, ...owner(c4), destino: m[3].trim(), fecha: parseFechaBanco(m[4]), fuente: 'bancolombia' };
   }
-  // Transferencia salida a una cuenta: "Transferiste $X desde tu cuenta *NNNN a la cuenta *MMMM el DD/MM/AAAA"
-  m = texto.match(/Transferiste\s+\$([\d.,]+)\s+desde\s+tu\s+cuenta\s+\*?(\d+)\s+a\s+la\s+cuenta\s+\*?(\d+)\s+el\s+(\d{2}\/\d{2}\/\d{2,4})/i);
+  // Transferencia salida a una cuenta: "Transferiste $X desde tu cuenta *NNNN a la cuenta *MMMM el DD/MM/AAAA".
+  // La cuenta destino externa suele venir como "* 47800002087" (espacio + número largo), por eso `\*?\s*`.
+  m = texto.match(/Transferiste\s+\$([\d.,]+)\s+desde\s+tu\s+cuenta\s+\*?\s*(\d+)\s+a\s+la\s+cuenta\s+\*?\s*(\d+)\s+el\s+(\d{2}\/\d{2}\/\d{2,4})/i);
   if (m) {
     const c4 = ultimos4(m[2]); const d4 = ultimos4(m[3]);
     return { clase: 'transferencia', direccion: 'salida', monto: parseMontoCOP(m[1]), moneda: 'COP',
