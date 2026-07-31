@@ -9,7 +9,8 @@
  * OJO: el token da acceso; trata la URL como sensible (no la compartas).
  */
 import { diagnosticoImap } from './_lib/gmail-imap.js';
-import { diagnosticoParseo, diagnosticoScan } from './_lib/captura-scan.js';
+import { diagnosticoParseo, diagnosticoScan, escanearBandeja } from './_lib/captura-scan.js';
+import { preguntarPendientes } from './_lib/silvia-preguntar.js';
 import { resumen } from './_lib/finanzas.js';
 import { renombrarCategoria, anularMontosNaN, corregirMonedaCuentasUSD, diagBuscarMovimientos, updateMovimientoCampos } from './_lib/repo.js';
 import { requireEnv } from './_lib/env.js';
@@ -34,6 +35,21 @@ export default async (req) => {
       const limit = Math.min(60, Math.max(1, Number(url.searchParams.get('limit')) || 20));
       const rep = await diagnosticoParseo({ dias: Math.min(dias, 7), limit });
       return new Response(JSON.stringify(rep, null, 2), {
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      });
+    }
+    // ?preguntar=1&desde=&hasta= → escanea la ventana y DISPARA las preguntas por
+    // WhatsApp (vía SilvIA) de los pendientes preguntables. Para probar el carril
+    // de preguntas end-to-end sin esperar el cron. Devuelve el detalle (a quién,
+    // enviado, y el motivo si falló → dice si el secret/URL están mal).
+    if (url.searchParams.get('preguntar')) {
+      const desde = url.searchParams.get('desde');
+      const hasta = url.searchParams.get('hasta');
+      const since = desde ? new Date(`${desde}T00:00:00Z`) : new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+      const before = hasta ? new Date(new Date(`${hasta}T00:00:00Z`).getTime() + 24 * 60 * 60 * 1000) : undefined;
+      const digest = await escanearBandeja({ since, before, limit: 40, newest: true });
+      const pre = await preguntarPendientes(digest.pendientes);
+      return new Response(JSON.stringify({ ok: true, pendientes: digest.pendientes.length, ...pre }, null, 2), {
         headers: { 'content-type': 'application/json; charset=utf-8' },
       });
     }
