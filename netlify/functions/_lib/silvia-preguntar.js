@@ -56,15 +56,18 @@ export async function preguntarSilvia({ transaccion, preguntarA, idempotency_key
  * `preguntar` es inyectable para tests. Devuelve contadores.
  */
 export async function preguntarPendientes(pendientes = [], { preguntar = preguntarSilvia } = {}) {
-  const res = { preguntados: 0, omitidos: 0, fallidos: 0 };
+  const res = { preguntados: 0, omitidos: 0, fallidos: 0, detalle: [] };
   for (const p of pendientes) {
     if (!esPreguntable(p)) { res.omitidos++; continue; }
+    const preguntarA = aQuienPreguntar(p);
     const r = await preguntar({
       transaccion: p,
-      preguntarA: aQuienPreguntar(p),
+      preguntarA,
       idempotency_key: p.message_id ? `email:${p.message_id}` : undefined,
     });
     if (r && r.enviado) res.preguntados++; else res.fallidos++;
+    // Detalle best-effort para diagnóstico (a quién, si se envió y por qué no).
+    res.detalle.push({ a: preguntarA.nombre, clase: p.clase, monto: p.monto, enviado: !!(r && r.enviado), motivo: r && r.motivo });
   }
   return res;
 }
