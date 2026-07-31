@@ -13,7 +13,7 @@ import { diagnosticoParseo, diagnosticoScan, escanearBandeja } from './_lib/capt
 import { preguntarPendientes } from './_lib/silvia-preguntar.js';
 import { resumen } from './_lib/finanzas.js';
 import { renombrarCategoria, anularMontosNaN, corregirMonedaCuentasUSD, diagBuscarMovimientos, updateMovimientoCampos } from './_lib/repo.js';
-import { requireEnv } from './_lib/env.js';
+import { requireEnv, env } from './_lib/env.js';
 
 export default async (req) => {
   const url = new URL(req.url);
@@ -37,6 +37,18 @@ export default async (req) => {
       return new Response(JSON.stringify(rep, null, 2), {
         headers: { 'content-type': 'application/json; charset=utf-8' },
       });
+    }
+    // ?envcheck=1 → reporta qué env vars del carril de preguntas ve la función en
+    // runtime (sin exponer valores completos), para depurar "no configurados".
+    if (url.searchParams.get('envcheck')) {
+      const u = env('SILVIA_FINANZAS_PREGUNTA_URL', '');
+      return new Response(JSON.stringify({
+        url_configurada: !!u,
+        url_prefijo: u ? u.slice(0, 45) : null,
+        secret_configurado: !!env('SILVIA_FINANZAS_PREGUNTA_SECRET'),
+        autobuild_secret_configurado: !!env('AUTOBUILD_NOTIFY_SECRET'),
+        auth_secret_configurado: !!env('AUTH_SECRET'),
+      }, null, 2), { headers: { 'content-type': 'application/json; charset=utf-8' } });
     }
     // ?preguntar=1&desde=&hasta= → escanea la ventana y DISPARA las preguntas por
     // WhatsApp (vía SilvIA) de los pendientes preguntables. Para probar el carril
