@@ -51,14 +51,24 @@ export function parseDelimLineas(text) {
   const lineas = [];
   const errores = [];
   const rows = String(text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  // Un campo "parece monto" si es solo dígitos/separadores/signo/paréntesis (NO
+  // texto). Sirve para detectar la columna del monto sin depender del ORDEN: el
+  // modelo a veces devuelve FECHA|MONTO|DESCRIPCION en vez de FECHA|DESCRIPCION|MONTO
+  // (visto en ARQ/DolarApp), y así ambos casos funcionan.
+  const pareceMonto = (s) => /^[-+(]?\s*\$?\s*[\d][\d.,\s]*\)?$/.test(String(s || '').trim());
   rows.forEach((row, i) => {
     if (!row.includes('|')) return; // ignora líneas que no son transacciones
-    const parts = row.split('|');
-    const fechaRaw = (parts[0] || '').trim();
-    const montoRaw = (parts[parts.length - 1] || '').trim();
-    const descripcion = parts.length >= 3 ? (parts.slice(1, -1).join(' ').trim() || null) : null;
-    const monto = parseMontoSigno(montoRaw);
+    const parts = row.split('|').map((p) => p.trim());
+    const fechaRaw = parts[0] || '';
+    // Monto: entre los campos 1..N, el último (derecha→izquierda) que parezca número.
+    let montoIdx = -1; let monto = null;
+    for (let j = parts.length - 1; j >= 1; j--) {
+      if (!pareceMonto(parts[j])) continue;
+      const cand = parseMontoSigno(parts[j]);
+      if (cand != null) { montoIdx = j; monto = cand; break; }
+    }
     if (!fechaRaw || monto == null) { errores.push(`Línea ${i + 1}: falta fecha o monto ("${row.slice(0, 48)}")`); return; }
+    const descripcion = parts.filter((_, k) => k !== 0 && k !== montoIdx).join(' ').trim() || null;
     lineas.push({
       fecha: normalizarFecha(fechaRaw),
       descripcion,
