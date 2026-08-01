@@ -108,7 +108,7 @@ function propuestaHTML(p) {
         ✓ Confirmar cruce elegido
       </button>`;
   } else {
-    accion = `<div class="h-meta" style="margin-top:4px">El banco registró esto pero no hay nada capturado que coincida. Regístralo manualmente si hace falta (💵 ingreso o el flujo normal de gasto).</div>`;
+    accion = `<div class="h-meta" style="margin-top:4px">El banco registró esto pero no está capturado. 👉 Regístralo abajo, en <b>"Solo en el banco (sin capturar)"</b> (elige categoría y toca "Contabilizar").</div>`;
   }
 
   return `<div class="h-item" style="flex-direction:column;align-items:stretch;gap:2px">
@@ -162,6 +162,9 @@ async function refreshPropuestas() {
       V('disc-resumen').textContent = `${disc.length} capturado(s) que el extracto no corrobora — puede ser timing (postea el mes siguiente) o un error de captura.`;
       V('disc-list').innerHTML = disc.map(discrepanciaHTML).join('');
     }
+    // Si hay líneas "solo en el banco", carga solas las editables (con categoría)
+    // para que el usuario no tenga que buscar el botón: son las que quiere registrar.
+    if ((res.n_solo_extracto || 0) > 0) await bfProponer();
   } catch (e) {
     list.innerHTML = `<div class="empty" style="color:var(--red)">${esc(e.message)}</div>`;
   }
@@ -300,10 +303,10 @@ async function bfAceptarTodo() {
     }
     const resumenTxt = `${creadas} línea${creadas === 1 ? '' : 's'} contabilizada${creadas === 1 ? '' : 's'} ✅`
       + (errores.length ? ` (${errores.length} con error — revísalas e intenta de nuevo).` : '');
-    // Refresca ambas listas (algunas líneas dejaron de estar `sin_conciliar`); el
-    // mensaje de resultado se fija DESPUÉS porque refreshPropuestas/bfProponer lo limpian.
+    // Refresca las listas (algunas líneas dejaron de estar `sin_conciliar`);
+    // refreshPropuestas recarga solo las que aún queden sin capturar. El mensaje
+    // de resultado se fija DESPUÉS porque refresh/bfProponer lo limpian.
     await refreshPropuestas();
-    await bfProponer();
     V('bf-msg').textContent = resumenTxt;
     V('bf-msg').style.color = errores.length ? 'var(--gold)' : 'var(--green)';
   } catch (e) {
