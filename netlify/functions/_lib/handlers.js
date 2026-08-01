@@ -135,6 +135,46 @@ export function makeCorregirMovimientoHandler() {
 }
 
 /**
+ * Handler de ANULACIÓN para SilvIA (carril token). Borrado suave + reverso del
+ * asiento. Body: { id?, monto?, texto?/comercio?, motivo? }
+ *  - Con `id`: anula ese movimiento.
+ *  - Sin `id`: lo ubica por `monto` (±1, últimos 45 días). Si hay varios, devuelve
+ *    los candidatos para que SilvIA pregunte cuál (evita anular el equivocado).
+ */
+export function makeAnularMovimientoHandler() {
+  return async (req) => {
+    if (req.method !== 'POST') return bad('Método no permitido', 405);
+    const auth = authorize(req);
+    if (!auth.ok) return auth.response;
+    const body = await parseBody(req);
+    try {
+      let id = Number(body.id) || null;
+      if (!id) {
+        if (body.monto == null || body.monto === '') return bad('Falta id o monto para ubicar el movimiento a anular.');
+        const monto = parseMonto(body.monto);
+        if (!(monto > 0)) return bad('monto inválido para ubicar el movimiento a anular.');
+        const cands = await buscarMovimientosPorMonto({ monto, texto: body.texto || body.comercio });
+        if (!cands.length) {
+          return ok({ ok: false, no_encontrado: true, mensaje: `No encontré un movimiento reciente por ese monto para anular.` });
+        }
+        if (cands.length > 1) {
+          return ok({
+            ok: false, ambiguo: true,
+            candidatos: cands.map((c) => ({ id: c.id, fecha: c.fecha, descripcion: c.descripcion, categoria: c.categoria, monto: c.monto })),
+            mensaje: `Hay ${cands.length} movimientos por ese monto. ¿Cuál anulo? Dime el id.`,
+          });
+        }
+        id = cands[0].id;
+      }
+      const res = await anularMovimientoCompleto(id, body.motivo || 'anulado por el usuario vía SilvIA');
+      return ok(res);
+    } catch (e) {
+      return bad(e.message, e.status || 422);
+    }
+  };
+}
+
+/**
  * Handler de captura por correo (carril token). Body: { message_id, from,
  * subject, body }. Parsea la notificación bancaria y, si es un gasto reconocido,
  * lo registra + contabiliza (idempotente por message-id). Ingresos/transferencias
