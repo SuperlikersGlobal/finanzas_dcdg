@@ -175,6 +175,83 @@ export function makeAnularMovimientoHandler() {
 }
 
 /**
+ * Handler de CONCILIACIÓN de extracto para SilvIA (carril token). Recibe las
+ * transacciones de un extracto (ya extraídas por la visión de Claude en el CRM:
+ * `lineas` estructuradas, o `texto` a parsear acá), las guarda, cruza con lo ya
+ * registrado (provisional, misma ventana de fechas), AUTO-concilia los matches
+ * claros y devuelve las que NO están registradas para que SilvIA pregunte.
+ * Body: { cuenta, lineas?: [{fecha,descripcion,monto}], texto?, periodo?,
+ *         fecha_desde?, fecha_hasta?, saldo_inicial?, saldo_final?, moneda? }
+ * `monto` con signo: negativo = débito (gasto), positivo = crédito (ingreso).
+ */
+export function makeConciliarExtractoHandler() {
+  return async (req) => {
+    if (req.method !== 'POST') return bad('Método no permitido', 405);
+    const auth = authorize(req);
+    if (!auth.ok) return auth.response;
+    const body = await parseBody(req);
+    const cuenta = String(body.cuenta || '').trim();
+    if (!cuenta) return bad('cuenta requerida (a qué cuenta/tarjeta corresponde el extracto).');
+    try {
+      // 1) Líneas: estructuradas (visión de Claude) o del texto (parser propio).
+      let lineas; let errores = [];
+      if (Array.isArray(body.lineas) && body.lineas.length) {
+        lineas = body.lineas
+          .map((l) => ({ fecha: toISODate(l.fecha) || l.fecha, descripcion: String(l.descripcion || '').trim(), monto: Number(l.monto) }))
+          .filter((l) => l.fecha && Number.isFinite(l.monto) && l.monto !== 0);
+      } else if (String(body.texto || '').trim()) {
+        ({ lineas, errores } = await parseExtractoPdfText(String(body.texto)));
+      } else {
+        return bad('Faltan las transacciones del extracto (lineas[] o texto).');
+      }
+      if (!lineas || !lineas.length) return bad('No se encontraron transacciones válidas en el extracto.', 422);
+
+      // 2) Guardar extracto + líneas.
+      const extracto = await insertExtracto({
+        cuenta, periodo: body.periodo, fecha_desde: body.fecha_desde, fecha_hasta: body.fecha_hasta,
+        saldo_inicial: body.saldo_inicial, saldo_final: body.saldo_final, moneda: body.moneda, fuente: 'pdf',
+      });
+      await insertExtractoLineas(extracto.id, lineas);
+
+      // 3) Cruzar con lo provisional en la ventana de fechas.
+      const sinConciliar = (await queryExtractoLineas({ extracto_id: extracto.id }))
+        .filter((l) => l.estado === 'sin_conciliar')
+        .map((l) => ({ ...l, fecha: toISODate(l.fecha) }));
+      const fechas = sinConciliar.map((l) => l.fecha).filter(Boolean).sort();
+      const desde = addDias(toISODate(body.fecha_desde) || fechas[0], -VENTANA_DIAS_DEFAULT);
+      const hasta = addDias(toISODate(body.fecha_hasta) || fechas[fechas.length - 1], VENTANA_DIAS_DEFAULT);
+      const [movs, ings] = await Promise.all([
+        queryMovimientosProvisionales({ desde, hasta }),
+        queryIngresosProvisionales({ desde, hasta }),
+      ]);
+      const norm = (arr) => arr.map((m) => ({ ...m, fecha: toISODate(m.fecha) }));
+      const propuestas = proponerCruces(sinConciliar, norm(movs), norm(ings), VENTANA_DIAS_DEFAULT);
+
+      // 4) Auto-conciliar los matches claros (1 solo candidato).
+      let conciliadas = 0;
+      for (const p of propuestas) {
+        if (p.caso === 'match' && p.candidatos[0]) {
+          try { await confirmarConciliacion({ linea_id: p.linea_id, tipo: p.candidatos[0].tipo, id: p.candidatos[0].id }); conciliadas++; } catch (_) { /* ya no provisional: seguir */ }
+        }
+      }
+
+      // 5) Devolver las NO registradas (para preguntar) + las ambiguas.
+      const fmt = (p) => ({ linea_id: p.linea_id, fecha: p.fecha, descripcion: p.descripcion, monto: p.monto, tipo_linea: p.tipo_linea });
+      const no_registradas = propuestas.filter((p) => p.caso === 'solo_extracto').map(fmt);
+      const ambiguas = propuestas.filter((p) => p.caso === 'ambiguo')
+        .map((p) => ({ ...fmt(p), candidatos: p.candidatos.map((c) => ({ tipo: c.tipo, id: c.id })) }));
+      return ok({
+        ok: true, extracto_id: extracto.id,
+        resumen: { total: propuestas.length, conciliadas, ambiguas: ambiguas.length, no_registradas: no_registradas.length },
+        no_registradas, ambiguas, errores,
+      });
+    } catch (e) {
+      return bad(e.message, e.status || 422);
+    }
+  };
+}
+
+/**
  * Handler de captura por correo (carril token). Body: { message_id, from,
  * subject, body }. Parsea la notificación bancaria y, si es un gasto reconocido,
  * lo registra + contabiliza (idempotente por message-id). Ingresos/transferencias
