@@ -39,3 +39,16 @@ test('biofood → gasto de hijos', () => {
 test('sin match devuelve null', () => {
   assert.equal(classifyByRules('comercio totalmente desconocido xyz'), null);
 });
+
+test('mercado: Tiendas Ara → Mercado (keyword real de comercio)', () => {
+  const r = classifyByRules('Compra en Tiendas Ara Cra 15');
+  assert.equal(r.categoria, 'Alimentación');
+  assert.equal(r.subcategoria, 'Mercado');
+});
+
+test('issue #210: "para" no debe matchear la regla de Tiendas Ara', () => {
+  const r = classifyByRules(
+    'Devolución de préstamo para pagar cuota de medicina prepagada'
+  );
+  assert.equal(r, null, 'no debe clasificarse como Alimentación/Mercado por la palabra "para"');
+});

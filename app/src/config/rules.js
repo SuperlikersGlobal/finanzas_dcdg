@@ -37,7 +37,7 @@ export function normalize(text) {
 export const RULES = [
   // ── MERCADO ────────────────────────────────────────────────
   { id: 'mercado-d1', match: ['tienda d1', 'd1 '], categoria: 'Alimentación', subcategoria: 'Mercado' },
-  { id: 'mercado-ara', match: ['ara '], categoria: 'Alimentación', subcategoria: 'Mercado' },
+  { id: 'mercado-ara', match: [' ara '], categoria: 'Alimentación', subcategoria: 'Mercado' },
   { id: 'mercado-dollarcity', match: ['dollarcity', 'dollar city'], categoria: 'Alimentación', subcategoria: 'Mercado' },
   { id: 'mercado-olimpica', match: ['olimpica', 'olímpica', 'sto ', 'supertiendas'], categoria: 'Alimentación', subcategoria: 'Mercado' },
   { id: 'mercado-makro', match: ['makro'], categoria: 'Alimentación', subcategoria: 'Mercado' },
@@ -87,10 +87,17 @@ export const RULES = [
  * @returns {null | {categoria, subcategoria, metodo_pago?, iwin_prestamo?, regla, fuente:'reglas'}}
  */
 export function classifyByRules(descripcion) {
-  const n = normalize(descripcion);
-  if (!n) return null;
+  const norm = normalize(descripcion);
+  if (!norm) return null;
+  // Padding con espacios permite que keywords con delimitadores (p.ej. ' ara ')
+  // matcheen también al inicio/fin de la descripción, sin afectar keywords
+  // existentes (la cadena rellenada siempre contiene la original).
+  const n = ` ${norm} `;
   for (const r of RULES) {
-    if (r.match.some((kw) => n.includes(normalize(kw)))) {
+    // Los keywords ya están normalizados (ver JSDoc de RULES): no se les vuelve
+    // a aplicar normalize(), porque este hace trim() y rompería los que usan
+    // espacios como delimitador de palabra completa (p.ej. ' ara ').
+    if (r.match.some((kw) => n.includes(kw))) {
       const out = {
         categoria: r.categoria,
         subcategoria: r.subcategoria,
