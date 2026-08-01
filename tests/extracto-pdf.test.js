@@ -59,3 +59,24 @@ test('parseExtractoPdfText: usa modelo rápido y estructura la salida (inyectado
   assert.equal(r.lineas[0].tipo, 'debito');
   assert.equal(r.lineas[1].tipo, 'credito');
 });
+
+test('parseDelimLineas: agnóstico al orden — FECHA|MONTO|DESCRIPCION (ARQ/DolarApp)', () => {
+  const { lineas, errores } = parseDelimLineas(
+    '2026-07-03|-10700|TDC Montecarmelo\n2026-07-05|25000|Pago recibido',
+  );
+  assert.equal(errores.length, 0);
+  assert.equal(lineas.length, 2);
+  assert.equal(lineas[0].monto, -10700);
+  assert.equal(lineas[0].descripcion, 'TDC Montecarmelo');
+  assert.equal(lineas[0].tipo, 'debito');
+  assert.equal(lineas[1].monto, 25000);
+  assert.equal(lineas[1].descripcion, 'Pago recibido');
+  assert.equal(lineas[1].tipo, 'credito');
+});
+
+test('parseDelimLineas: no confunde una descripción con dígitos por el monto', () => {
+  const { lineas } = parseDelimLineas('2026-07-03|Compra 3 panes D1|-8900');
+  assert.equal(lineas.length, 1);
+  assert.equal(lineas[0].monto, -8900);
+  assert.equal(lineas[0].descripcion, 'Compra 3 panes D1');
+});
