@@ -58,7 +58,7 @@ import {
 } from './prestamos.js';
 import { crearSolicitudMejora, listarSolicitudesAbiertas } from './backlog.js';
 import { anularMovimientoCompleto, recategorizarMovimiento } from './corregir.js';
-import { hoyISO } from '../../../app/src/utils/formatters.js';
+import { hoyISO, parseMonto } from '../../../app/src/utils/formatters.js';
 
 const CONFIG_GITHUB_RE = /Configura GITHUB_TOKEN_FINANZAS/;
 
@@ -108,7 +108,9 @@ export function makeCorregirMovimientoHandler() {
       let id = Number(body.id) || null;
       if (!id) {
         if (body.monto == null || body.monto === '') return bad('Falta id o monto para ubicar el movimiento a corregir.');
-        const cands = await buscarMovimientosPorMonto({ monto: body.monto, texto: body.texto || body.comercio });
+        const monto = parseMonto(body.monto); // acepta "26.000", "26 mil", etc.
+        if (!(monto > 0)) return bad('monto inválido para ubicar el movimiento a corregir.');
+        const cands = await buscarMovimientosPorMonto({ monto, texto: body.texto || body.comercio });
         if (!cands.length) {
           return ok({ ok: false, no_encontrado: true, mensaje: `No encontré un movimiento reciente por ese monto para corregir.` });
         }
