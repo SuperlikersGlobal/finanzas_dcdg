@@ -19,7 +19,7 @@ import {
   getExtracto, queryMovimientosProvisionales, queryIngresosProvisionales, confirmarConciliacion,
   queryAsientos, movimientosSinAsiento, ingresosSinAsiento,
   insertMovimiento, getExtractoLinea, marcarLineaMaterializada,
-  listCuentasMeta, upsertCuentaMeta, insertCostoActividad,
+  listCuentasMeta, upsertCuentaMeta, insertCostoActividad, buscarMovimientosPorMonto,
 } from './repo.js';
 import { deriveIngresoKey, deriveAporteHogarKey, deriveCostoActividadKey } from './idempotency.js';
 import { reporteCostosActividad } from './costos.js';
@@ -86,6 +86,48 @@ export function makeRegistrarHandler(tipo) {
       return ok(result);
     } catch (e) {
       return bad(e.message, 422);
+    }
+  };
+}
+
+/**
+ * Handler de CORRECCIÓN/reclasificación para SilvIA (carril token). En vez de
+ * re-registrar (que DUPLICA), actualiza un movimiento ya existente y recontabiliza.
+ * Body: { id?, monto?, texto?/comercio?, categoria?, subcategoria?, tipo?, descripcion? }
+ *  - Con `id`: corrige ese movimiento.
+ *  - Sin `id`: ubica por `monto` (±1, últimos 45 días). Si hay varios, devuelve los
+ *    candidatos para que SilvIA pregunte cuál (evita corregir el equivocado).
+ */
+export function makeCorregirMovimientoHandler() {
+  return async (req) => {
+    if (req.method !== 'POST') return bad('Método no permitido', 405);
+    const auth = authorize(req);
+    if (!auth.ok) return auth.response;
+    const body = await parseBody(req);
+    try {
+      let id = Number(body.id) || null;
+      if (!id) {
+        if (body.monto == null || body.monto === '') return bad('Falta id o monto para ubicar el movimiento a corregir.');
+        const cands = await buscarMovimientosPorMonto({ monto: body.monto, texto: body.texto || body.comercio });
+        if (!cands.length) {
+          return ok({ ok: false, no_encontrado: true, mensaje: `No encontré un movimiento reciente por ese monto para corregir.` });
+        }
+        if (cands.length > 1) {
+          return ok({
+            ok: false, ambiguo: true,
+            candidatos: cands.map((c) => ({ id: c.id, fecha: c.fecha, descripcion: c.descripcion, categoria: c.categoria, monto: c.monto })),
+            mensaje: `Hay ${cands.length} movimientos por ese monto. ¿Cuál corrijo? Dime el id.`,
+          });
+        }
+        id = cands[0].id;
+      }
+      const res = await recategorizarMovimiento(id, {
+        categoria: body.categoria, subcategoria: body.subcategoria,
+        tipo: body.tipo, descripcion: body.descripcion,
+      });
+      return ok(res);
+    } catch (e) {
+      return bad(e.message, e.status || 422);
     }
   };
 }

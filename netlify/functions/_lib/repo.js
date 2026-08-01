@@ -212,6 +212,29 @@ export async function anularMontosNaN(sqlArg) {
   return rows.length;
 }
 
+/** Busca movimientos recientes por monto (±1) y texto opcional, para ubicar cuál
+ *  corregir cuando SilvIA reclasifica ("la de $26.000 era X"). Excluye anulados y
+ *  transferencias; ordena por fecha desc. Devuelve varios para desambiguar. */
+export async function buscarMovimientosPorMonto({ monto, texto, dias = 45, limit = 6 }, sqlArg) {
+  const sql = sqlArg || await getSql();
+  await ensureCorreccionSchema(sql);
+  const m = Number(monto);
+  if (!Number.isFinite(m)) return [];
+  const d = Math.max(1, Math.min(Number(dias) || 45, 365));
+  const params = [m];
+  let filtro = `not coalesce(anulado,false) and coalesce(tipo,'gasto') <> 'transferencia'
+      and coalesce(monto::text,'') <> 'NaN' and abs(monto::numeric - $1) <= 1
+      and fecha >= (current_date - ($2 || ' days')::interval)`;
+  params.push(String(d));
+  if (texto) { params.push(`%${String(texto).toLowerCase()}%`); filtro += ` and lower(coalesce(descripcion,'')) like $${params.length}`; }
+  params.push(Math.max(1, Math.min(Number(limit) || 6, 20)));
+  const rows = await sql.query(
+    `select id, fecha, tipo, categoria, subcategoria, descripcion, monto, moneda, metodo_pago, quien_pago
+       from movimientos where ${filtro}
+      order by fecha desc, creado_en desc limit $${params.length}`, params);
+  return rows;
+}
+
 /** Diagnóstico: busca movimientos por texto en descripción o método de pago,
  *  INCLUYENDO anulados, para depurar "lo registré pero no aparece". */
 export async function diagBuscarMovimientos(texto, sqlArg) {
