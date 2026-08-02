@@ -31,6 +31,7 @@ import { deriveIdempotencyKey } from './idempotency.js';
 import { clasificar } from './classify.js';
 import { evaluarMovimiento } from '../../../app/src/config/iwin.js';
 import { cuentaPorTarjeta, monedaDeCuenta } from '../../../app/src/config/accounts.js';
+import { viajeActivo } from './viajes.js';
 import {
   parseMonto,
   normalizarFecha,
@@ -187,12 +188,21 @@ export async function registrarMovimiento(mov = {}) {
     tipoGastoOverride: mov.tipo_gasto, personaOverride: mov.tipo_gasto_persona,
   });
 
+  // Viaje: un viaje_id explícito manda; si no, se auto-etiqueta al viaje ACTIVO
+  // de la persona SOLO para lo que ella reporta (SilvIA/App), no la captura
+  // automática por correo (que traería gastos del hogar al viaje).
+  let viaje_id = null;
+  if (mov.viaje_id) viaje_id = Number(mov.viaje_id) || null;
+  else if (mov.viaje_id === undefined && (origen === 'SilvIA' || origen === 'App')) {
+    try { const v = await viajeActivo(titular); if (v) viaje_id = v.id; } catch (_) { /* sin viaje: sigue */ }
+  }
+
   const { inserted, row } = await insertMovimiento({
     fecha, tipo, categoria, subcategoria, descripcion, monto, moneda,
     metodo_pago: metodo, quien_pago: titular, tarjeta, notas, origen,
     idempotency_key: idempotencyKey,
     tipo_gasto: tipoGasto.tipo_gasto, tipo_gasto_persona: tipoGasto.tipo_gasto_persona,
-    tipo_gasto_auto: tipoGasto.tipo_gasto_auto,
+    tipo_gasto_auto: tipoGasto.tipo_gasto_auto, viaje_id,
   });
 
   // Reintento exacto (misma llave) → ya estaba; no duplicamos ni re-espejamos.

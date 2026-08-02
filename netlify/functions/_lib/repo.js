@@ -10,6 +10,7 @@
  */
 
 import { getSql } from './db.js';
+import { ensureViajesSchema } from './viajes.js';
 import { normalize } from '../../../app/src/config/rules.js';
 
 /**
@@ -21,15 +22,16 @@ export async function insertMovimiento(m, sqlArg) {
   const sql = sqlArg || await getSql();
   await ensureTipoGastoSchema(sql);
   await ensureTransferenciaMonedaSchema(sql);
+  await ensureViajesSchema(sql); // añade movimientos.viaje_id si falta
   const cols = ['fecha', 'tipo', 'categoria', 'subcategoria', 'descripcion', 'monto', 'moneda',
     'metodo_pago', 'quien_pago', 'tarjeta', 'cuenta_destino', 'notas', 'origen', 'idempotency_key',
     'estado_conciliacion', 'extracto_linea_id', 'tipo_gasto', 'tipo_gasto_persona', 'tipo_gasto_auto',
-    'monto_destino', 'moneda_destino'];
+    'monto_destino', 'moneda_destino', 'viaje_id'];
   const vals = [m.fecha, m.tipo, m.categoria, m.subcategoria, m.descripcion, m.monto, m.moneda || 'COP',
     m.metodo_pago, m.quien_pago, m.tarjeta, m.cuenta_destino || null, m.notas, m.origen, m.idempotency_key,
     m.estado_conciliacion || 'provisional', m.extracto_linea_id || null,
     m.tipo_gasto || 'hogar', m.tipo_gasto_persona || null, m.tipo_gasto_auto === undefined ? true : !!m.tipo_gasto_auto,
-    m.monto_destino || null, m.moneda_destino || null];
+    m.monto_destino || null, m.moneda_destino || null, m.viaje_id || null];
   const ph = vals.map((_, i) => `$${i + 1}`).join(', ');
   const ins = await sql.query(
     `insert into movimientos (${cols.join(', ')}) values (${ph})
