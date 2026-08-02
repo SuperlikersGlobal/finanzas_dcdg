@@ -40,6 +40,7 @@ import { patrimonioPorPersona, miPatrimonio } from './patrimonio.js';
 import { listarMetasConProgreso, crearMeta, editarMeta, CATEGORIAS_META } from './metas.js';
 import { reportePresupuesto, guardarPresupuesto } from './presupuesto.js';
 import { proponerCruces, cuadreExtracto, detectarDiscrepancias, VENTANA_DIAS_DEFAULT, toISODate } from './conciliacion.js';
+import { crearViaje, cerrarViaje, resumenViaje, listViajes } from './viajes.js';
 import { proponerBackfillExtracto } from './backfill.js';
 import { reporteAportes } from './aportes.js';
 import { reporteRentaAnual } from './renta-anual.js';
@@ -245,6 +246,45 @@ export function makeConciliarExtractoHandler() {
         resumen: { total: propuestas.length, conciliadas, ambiguas: ambiguas.length, no_registradas: no_registradas.length },
         no_registradas, ambiguas, errores,
       });
+    } catch (e) {
+      return bad(e.message, e.status || 422);
+    }
+  };
+}
+
+/**
+ * Handler de VIAJES para SilvIA (carril token). Agrupa gastos de un viaje y
+ * reporta cuánto se lleva por rubro. Body: { accion, nombre?, tipo?, quien?,
+ * entidad_id?, notas?, viaje_id? }.
+ *   accion: iniciar | cerrar | resumen | listar
+ * Mientras un viaje está activo, los gastos que la persona reporta se etiquetan
+ * solos (ver registrarMovimiento).
+ */
+export function makeViajeHandler() {
+  return async (req) => {
+    if (req.method !== 'POST') return bad('Método no permitido', 405);
+    const auth = authorize(req);
+    if (!auth.ok) return auth.response;
+    const body = await parseBody(req);
+    const accion = String(body.accion || 'resumen').toLowerCase();
+    const quien = body.quien || undefined;
+    try {
+      if (accion === 'iniciar' || accion === 'crear') {
+        const v = await crearViaje({ nombre: body.nombre, tipo: body.tipo, quien, entidad_id: body.entidad_id, notas: body.notas });
+        return ok({ ok: true, viaje: v, mensaje: `Viaje "${v.nombre}" iniciado ✅ (${v.tipo}). Desde ahora te etiqueto los gastos que reportes hasta que lo cierres.` });
+      }
+      if (accion === 'cerrar' || accion === 'terminar') {
+        const v = await cerrarViaje({ viaje_id: body.viaje_id, quien });
+        if (!v) return ok({ ok: false, mensaje: 'No encontré un viaje activo para cerrar.' });
+        return ok({ ok: true, viaje: v, mensaje: `Viaje "${v.nombre}" cerrado ✅.` });
+      }
+      if (accion === 'listar') {
+        return ok({ ok: true, viajes: await listViajes({ soloActivos: !!body.activos }) });
+      }
+      // resumen (default)
+      const r = await resumenViaje({ viaje_id: body.viaje_id, quien });
+      if (!r) return ok({ ok: false, mensaje: 'No hay un viaje activo. Inícialo con accion=iniciar.' });
+      return ok({ ok: true, ...r });
     } catch (e) {
       return bad(e.message, e.status || 422);
     }
