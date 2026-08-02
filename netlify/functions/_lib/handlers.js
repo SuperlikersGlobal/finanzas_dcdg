@@ -40,7 +40,7 @@ import { patrimonioPorPersona, miPatrimonio } from './patrimonio.js';
 import { listarMetasConProgreso, crearMeta, editarMeta, CATEGORIAS_META } from './metas.js';
 import { reportePresupuesto, guardarPresupuesto } from './presupuesto.js';
 import { proponerCruces, cuadreExtracto, detectarDiscrepancias, VENTANA_DIAS_DEFAULT, toISODate } from './conciliacion.js';
-import { crearViaje, cerrarViaje, resumenViaje, listViajes } from './viajes.js';
+import { crearViaje, cerrarViaje, resumenViaje, listViajes, resumenTarjeta } from './viajes.js';
 import { proponerBackfillExtracto } from './backfill.js';
 import { reporteAportes } from './aportes.js';
 import { reporteRentaAnual } from './renta-anual.js';
@@ -284,6 +284,37 @@ export function makeViajeHandler() {
       // resumen (default)
       const r = await resumenViaje({ viaje_id: body.viaje_id, quien });
       if (!r) return ok({ ok: false, mensaje: 'No hay un viaje activo. Inícialo con accion=iniciar.' });
+      return ok({ ok: true, ...r });
+    } catch (e) {
+      return bad(e.message, e.status || 422);
+    }
+  };
+}
+
+/**
+ * Uso de la tarjeta Jeeves/iWin. POST { desde?, hasta? } (o GET con query).
+ * Devuelve qué se pagó con la tarjeta separado por beneficiario (Familia vs
+ * Empresa/iWin), rubro y moneda. Carril token (SilvIA) y también sirve al PWA.
+ */
+export function makeTarjetaHandler() {
+  return async (req) => {
+    // Doble carril: token de servicio (SilvIA) o sesión Google del PWA.
+    const svc = authorize(req);
+    if (!svc.ok) {
+      const bearer = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+      try { await resolvePwaUser(bearer); } catch (e) { return bad(e.message, e.status || 401); }
+    }
+    let desde, hasta;
+    if (req.method === 'POST') {
+      const body = await parseBody(req);
+      desde = body.desde; hasta = body.hasta;
+    } else {
+      const u = new URL(req.url);
+      desde = u.searchParams.get('desde') || undefined;
+      hasta = u.searchParams.get('hasta') || undefined;
+    }
+    try {
+      const r = await resumenTarjeta({ desde, hasta });
       return ok({ ok: true, ...r });
     } catch (e) {
       return bad(e.message, e.status || 422);

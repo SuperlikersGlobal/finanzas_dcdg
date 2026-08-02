@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { crearViaje, viajeActivo, cerrarViaje, resetViajesSchemaParaTests } from '../netlify/functions/_lib/viajes.js';
+import { crearViaje, viajeActivo, cerrarViaje, resumenTarjeta, resetViajesSchemaParaTests } from '../netlify/functions/_lib/viajes.js';
 
 // Postgres falseado en memoria para las queries de viajes.
 function fakeDb() {
@@ -59,4 +59,32 @@ test('cerrarViaje: cierra el activo de la persona', async () => {
   const cerrado = await cerrarViaje({ quien: 'Carolina' }, db);
   assert.equal(cerrado.nombre, 'Viaje C');
   assert.equal(await viajeActivo('Carolina', db), null);
+});
+
+test('resumenTarjeta: filtra Jeeves/iWin, aplica rango y separa por beneficiario', async () => {
+  resetViajesSchemaParaTests();
+  const calls = [];
+  const db = {
+    query: async (text, params = []) => {
+      const t = String(text).replace(/\s+/g, ' ').trim().toLowerCase();
+      if (/create table|alter table/.test(t)) return [];
+      calls.push({ t, params });
+      if (t.includes('group by 1,2 order by 3')) {
+        return [
+          { beneficiario: 'Empresa (iWin)', moneda: 'USD', monto: 800, n: 1 },
+          { beneficiario: 'Familia (personal)', moneda: 'COP', monto: 120000, n: 2 },
+        ];
+      }
+      if (t.includes('group by 1,2,3 order by 4')) return [{ beneficiario: 'Empresa (iWin)', categoria: 'Transporte', moneda: 'USD', monto: 800, n: 1 }];
+      return [{ id: 5, beneficiario: 'Empresa (iWin)', monto: 800 }];
+    },
+  };
+  const r = await resumenTarjeta({ desde: '2026-07-01', hasta: '2026-07-31' }, db);
+  // Sólo movimientos con la tarjeta Jeeves/iWin, con el rango de fechas aplicado.
+  const agg = calls.find((c) => c.t.includes('group by 1,2 order by 3'));
+  assert.ok(agg.t.includes('jeeves') && agg.t.includes('iwin'));
+  assert.deepEqual(agg.params, ['2026-07-01', '2026-07-31']);
+  assert.equal(r.por_beneficiario.length, 2);
+  assert.equal(r.por_beneficiario[0].beneficiario, 'Empresa (iWin)');
+  assert.equal(r.desde, '2026-07-01');
 });

@@ -26,12 +26,12 @@ export async function insertMovimiento(m, sqlArg) {
   const cols = ['fecha', 'tipo', 'categoria', 'subcategoria', 'descripcion', 'monto', 'moneda',
     'metodo_pago', 'quien_pago', 'tarjeta', 'cuenta_destino', 'notas', 'origen', 'idempotency_key',
     'estado_conciliacion', 'extracto_linea_id', 'tipo_gasto', 'tipo_gasto_persona', 'tipo_gasto_auto',
-    'monto_destino', 'moneda_destino', 'viaje_id'];
+    'monto_destino', 'moneda_destino', 'viaje_id', 'beneficiario'];
   const vals = [m.fecha, m.tipo, m.categoria, m.subcategoria, m.descripcion, m.monto, m.moneda || 'COP',
     m.metodo_pago, m.quien_pago, m.tarjeta, m.cuenta_destino || null, m.notas, m.origen, m.idempotency_key,
     m.estado_conciliacion || 'provisional', m.extracto_linea_id || null,
     m.tipo_gasto || 'hogar', m.tipo_gasto_persona || null, m.tipo_gasto_auto === undefined ? true : !!m.tipo_gasto_auto,
-    m.monto_destino || null, m.moneda_destino || null, m.viaje_id || null];
+    m.monto_destino || null, m.moneda_destino || null, m.viaje_id || null, m.beneficiario || 'familia'];
   const ph = vals.map((_, i) => `$${i + 1}`).join(', ');
   const ins = await sql.query(
     `insert into movimientos (${cols.join(', ')}) values (${ph})
@@ -335,6 +335,7 @@ export async function logEvento(tipo, origen, payload, sqlArg) {
 export async function queryResumen({ desde, hasta, categoria, quien }, sqlArg) {
   const sql = sqlArg || await getSql();
   await ensureCorreccionSchema(sql);
+  await ensureViajesSchema(sql); // garantiza la columna `beneficiario`
   const params = [desde, hasta];
   // Excluye transferencias (no son gasto), anulados, y limita el total a COP (no
   // se mezclan monedas). Los movimientos en USD se ven en la lista, no en el total.
@@ -342,7 +343,9 @@ export async function queryResumen({ desde, hasta, categoria, quien }, sqlArg) {
   // mal parseo anterior): en SQL, un solo NaN vuelve NaN toda la suma → el total
   // salía "$0". Type-agnostic (numeric o float8). Se prevé el origen del NaN en
   // registrarMovimiento/parseMontoCOP, pero esto protege el resumen igual.
-  let filtro = "fecha >= $1 and fecha <= $2 and coalesce(tipo,'gasto') <> 'transferencia' and coalesce(moneda,'COP') = 'COP' and not coalesce(anulado,false) and coalesce(monto::text,'') <> 'NaN'";
+  // `beneficiario <> 'empresa'` excluye gastos de iWin (tarjeta Jeeves usada para
+  // costos de la empresa): se rastrean pero NO cuentan en el presupuesto familiar.
+  let filtro = "fecha >= $1 and fecha <= $2 and coalesce(tipo,'gasto') <> 'transferencia' and coalesce(moneda,'COP') = 'COP' and not coalesce(anulado,false) and coalesce(monto::text,'') <> 'NaN' and coalesce(beneficiario,'familia') <> 'empresa'";
   if (categoria) { params.push(`%${categoria.toLowerCase()}%`); filtro += ` and lower(categoria) like $${params.length}`; }
   if (quien) { params.push(`%${quien.toLowerCase()}%`); filtro += ` and lower(coalesce(quien_pago,'')) like $${params.length}`; }
   const agg = await sql.query(

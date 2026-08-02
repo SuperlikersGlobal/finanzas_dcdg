@@ -125,6 +125,12 @@ export async function registrarMovimiento(mov = {}) {
     return { ok: true, registrado: false, motivo: evalMov.motivo, tipo, monto };
   }
 
+  // Beneficiario: 'empresa' (iWin) → es costo de la empresa, NO genera adelanto de
+  // honorarios ni cuenta en el presupuesto FAMILIAR; solo se rastrea (tarjeta/viaje).
+  // 'familia' (default) → como siempre. Aplica sobre todo a gastos con la Jeeves/iWin.
+  const beneficiario = /^(empresa|iwin|negocio)/i.test(String(mov.beneficiario || '')) ? 'empresa' : 'familia';
+  if (beneficiario === 'empresa') evalMov.adelanto_empresas = false; // costo de iWin, no préstamo a la persona
+
   const fecha = corregirAnioProbable(normalizarFecha(mov.fecha));
   const origen = String(mov.origen || 'SilvIA');
   const titular = String(mov.quien_pago || '').trim() || 'Luis';
@@ -202,7 +208,7 @@ export async function registrarMovimiento(mov = {}) {
     metodo_pago: metodo, quien_pago: titular, tarjeta, notas, origen,
     idempotency_key: idempotencyKey,
     tipo_gasto: tipoGasto.tipo_gasto, tipo_gasto_persona: tipoGasto.tipo_gasto_persona,
-    tipo_gasto_auto: tipoGasto.tipo_gasto_auto, viaje_id,
+    tipo_gasto_auto: tipoGasto.tipo_gasto_auto, viaje_id, beneficiario,
   });
 
   // Reintento exacto (misma llave) → ya estaba; no duplicamos ni re-espejamos.

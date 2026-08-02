@@ -66,6 +66,9 @@ export const getResumen = (params = {}) => request('/api/pwa-resumen', { params 
 /** Lista de movimientos (gastos). */
 export const getMovimientos = (params = {}) => request('/api/pwa-movimientos', { params });
 
+/** Uso de la tarjeta Jeeves/iWin, separado familia vs empresa, por rubro y moneda. */
+export const getUsoTarjeta = (params = {}) => request('/api/tarjeta', { params });
+
 /** Catálogos para el formulario de ingresos (entidades, terceros, cédulas). */
 export const getCatalogos = () => request('/api/pwa-catalogos');
 

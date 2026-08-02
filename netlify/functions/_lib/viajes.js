@@ -30,6 +30,10 @@ export async function ensureViajesSchema(sqlArg) {
         creado_en timestamptz default now()
       )`, []);
       await sql.query('alter table movimientos add column if not exists viaje_id integer', []);
+      // beneficiario: 'familia' (default) | 'empresa' (iWin) — para saber si un gasto
+      // con la tarjeta Jeeves/iWin es familiar (adelanto, cuenta en presupuesto) o
+      // de la empresa (costo de iWin: se rastrea pero no cuenta en lo familiar).
+      await sql.query("alter table movimientos add column if not exists beneficiario text default 'familia'", []);
     })().catch((e) => { _schema = null; throw e; });
   }
   return _schema;
@@ -104,4 +108,31 @@ export async function resumenViaje({ viaje_id, quien } = {}, sqlArg) {
     sql.query(`select id, fecha, categoria, subcategoria, descripcion, monto, coalesce(moneda,'COP') moneda, metodo_pago from movimientos where ${filtro} order by fecha desc, id desc limit 60`, [viaje.id]),
   ]);
   return { viaje, por_moneda: porMoneda, por_categoria: porCategoria, por_pagador: porPagador, movimientos: items };
+}
+
+// Movimientos hechos con la tarjeta Jeeves/iWin (por método de pago).
+const FILTRO_JEEVES = "(metodo_pago ilike '%jeeves%' or metodo_pago ilike '%iwin%' or metodo_pago ilike '%superlikers%')";
+
+/**
+ * Uso de la tarjeta Jeeves/iWin: qué se pagó con esa tarjeta, separado por
+ * beneficiario (Familia = adelanto de honorarios / Empresa = costo de iWin),
+ * por rubro y por moneda. Sirve para que el poseedor de la tarjeta sepa en qué
+ * la ha usado tanto para la familia como para la empresa.
+ * `desde`/`hasta` opcionales (YYYY-MM-DD). Sin fechas, toma todo el histórico.
+ */
+export async function resumenTarjeta({ desde, hasta } = {}, sqlArg) {
+  const sql = sqlArg || await getSql();
+  await ensureViajesSchema(sql);
+  const params = [];
+  let rango = '';
+  if (desde) { params.push(desde); rango += ` and fecha >= $${params.length}`; }
+  if (hasta) { params.push(hasta); rango += ` and fecha <= $${params.length}`; }
+  const filtro = `${FILTRO_JEEVES} and not coalesce(anulado,false) and coalesce(monto::text,'')<>'NaN' and coalesce(tipo,'gasto')<>'transferencia'${rango}`;
+  const benef = "case when coalesce(beneficiario,'familia')='empresa' then 'Empresa (iWin)' else 'Familia (personal)' end";
+  const [porBeneficiario, porCategoria, items] = await Promise.all([
+    sql.query(`select ${benef} beneficiario, coalesce(moneda,'COP') moneda, sum(monto)::float8 monto, count(*)::int n from movimientos where ${filtro} group by 1,2 order by 3 desc`, params),
+    sql.query(`select ${benef} beneficiario, coalesce(categoria,'Sin categoría') categoria, coalesce(moneda,'COP') moneda, sum(monto)::float8 monto, count(*)::int n from movimientos where ${filtro} group by 1,2,3 order by 4 desc`, params),
+    sql.query(`select id, fecha, categoria, subcategoria, descripcion, monto, coalesce(moneda,'COP') moneda, ${benef} beneficiario, coalesce(viaje_id,0) viaje_id from movimientos where ${filtro} order by fecha desc, id desc limit 100`, params),
+  ]);
+  return { desde: desde || null, hasta: hasta || null, por_beneficiario: porBeneficiario, por_categoria: porCategoria, movimientos: items };
 }
