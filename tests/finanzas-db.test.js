@@ -332,3 +332,21 @@ test('resumen: top_comercios agrupa por descripción, ordena y limita a 5', asyn
 
   setSqlForTests(null);
 });
+
+test('gasto en MXN con tarjeta Jeeves + beneficiario empresa: preserva la moneda y no genera adelanto', async () => {
+  const db = fakeDb();
+  setSqlForTests(db);
+  const r = await registrarMovimiento({
+    tipo: 'gasto', monto: 3907.46, moneda: 'MXN', descripcion: 'Viva Aerobus MEX-MTY-MEX',
+    categoria: 'Viajes', subcategoria: 'Tiquetes', fecha: '2026-07-30', quien_pago: 'Luis',
+    metodo_pago: 'TC iWin (Superlikers)', tarjeta_ultimos4: '0530', beneficiario: 'empresa',
+  });
+  assert.equal(r.registrado, true);
+  // La moneda explícita MXN se guarda tal cual (no se coacciona a COP ni a USD).
+  assert.equal(db._movimientos[0].moneda, 'MXN');
+  // beneficiario=empresa (costo de iWin) → NO adelanto de honorarios.
+  assert.ok(!r.adelanto_empresas, 'no debe generar adelanto iWin');
+  assert.equal(db._empresas.length, 0);
+
+  setSqlForTests(null);
+});

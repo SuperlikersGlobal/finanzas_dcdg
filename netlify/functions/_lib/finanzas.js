@@ -50,9 +50,10 @@ const ETIQUETA_TIPO = {
   transferencia: '🔁 transferencia',
 };
 
-/** Formatea un monto según la moneda (COP con separador local; USD con prefijo). */
+/** Formatea un monto según la moneda: COP con separador local; otra (USD, MXN…) con su código. */
 function fmtMonto(monto, moneda) {
-  return moneda === 'USD' ? 'USD ' + Number(monto || 0).toLocaleString('en-US') : formatCOP(monto);
+  const m = String(moneda || 'COP').toUpperCase();
+  return m === 'COP' ? formatCOP(monto) : `${m} ` + Number(monto || 0).toLocaleString('en-US');
 }
 
 /**
@@ -77,8 +78,11 @@ export async function registrarMovimiento(mov = {}) {
   // esas mismas cuentas también gastan en COP en comercios locales (montos
   // ENTEROS: Olímpica $18.191, TAQUI $40.000) y esos NO se tocan. Una moneda
   // explícita del llamador siempre manda.
+  // La moneda EXPLÍCITA del llamador siempre manda (COP, USD, MXN, …): se guarda
+  // tal cual (ISO en mayúsculas). Sin moneda explícita, el default es COP y solo
+  // se infiere USD por el heurístico de centavos en cuentas USD (Jeeves, DollarApp).
   const monedaExplicita = mov.moneda != null && String(mov.moneda).trim() !== '';
-  let moneda = String(mov.moneda || '').toUpperCase() === 'USD' ? 'USD' : 'COP';
+  let moneda = monedaExplicita ? String(mov.moneda).toUpperCase().trim() : 'COP';
   if (!monedaExplicita
       && Number.isFinite(monto) && Math.round(monto) !== monto
       && monedaDeCuenta({ metodo_pago: mov.metodo_pago, tarjeta_ultimos4: mov.tarjeta_ultimos4 }) === 'USD') {

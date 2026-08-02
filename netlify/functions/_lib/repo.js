@@ -278,10 +278,11 @@ export async function corregirMonedaCuentasUSD(sqlArg) {
     `update movimientos set moneda = 'COP', actualizado_en = now()
       where moneda = 'USD' and ${base} and monto::numeric = trunc(monto::numeric)
       returning id`);
-  // 2) Marcar USD solo los montos con centavos (fraccionarios).
+  // 2) Marcar USD solo los montos con centavos (fraccionarios). Solo toca filas en
+  //    COP: una moneda explícita distinta (MXN, EUR…) NO se reinterpreta como USD.
   const marcados = await sql.query(
     `update movimientos set moneda = 'USD', actualizado_en = now()
-      where coalesce(moneda,'COP') <> 'USD' and ${base} and monto::numeric <> trunc(monto::numeric)
+      where coalesce(moneda,'COP') = 'COP' and ${base} and monto::numeric <> trunc(monto::numeric)
       returning id, fecha, descripcion, monto, metodo_pago`);
   return { revertidos: revertidos.length, marcados };
 }
