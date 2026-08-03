@@ -273,7 +273,10 @@ export function makeViajeHandler() {
     try {
       if (accion === 'iniciar' || accion === 'crear') {
         const v = await crearViaje({ nombre: body.nombre, tipo: body.tipo, quien, entidad_id: body.entidad_id, notas: body.notas });
-        return ok({ ok: true, viaje: v, mensaje: `Viaje "${v.nombre}" iniciado ✅ (${v.tipo}). Desde ahora te etiqueto los gastos que reportes hasta que lo cierres.` });
+        const mensaje = v._ya_existia
+          ? `El viaje "${v.nombre}" ya estaba activo ✅ — sigo etiquetando ahí los gastos que reportes. No hace falta iniciarlo de nuevo.`
+          : `Viaje "${v.nombre}" iniciado ✅ (${v.tipo}). Desde ahora te etiqueto los gastos que reportes hasta que lo cierres.`;
+        return ok({ ok: true, viaje: v, ya_existia: !!v._ya_existia, mensaje });
       }
       if (accion === 'cerrar' || accion === 'terminar') {
         const v = await cerrarViaje({ viaje_id: body.viaje_id, quien });
@@ -508,7 +511,8 @@ export async function pwaMovimientosHandler(req) {
   try {
     const rows = await queryMovimientos({
       desde: g('desde'), hasta: g('hasta'), categoria: g('categoria'),
-      quien: g('quien'), texto: g('texto'), tipoGasto: g('tipo_gasto'), limit: g('limit'),
+      quien: g('quien'), texto: g('texto'), tipoGasto: g('tipo_gasto'),
+      excluirViajes: /^(1|true|si|sí)$/i.test(String(g('excluir_viajes') || '')), limit: g('limit'),
     });
     return ok({ ok: true, movimientos: rows, n: rows.length });
   } catch (e) {

@@ -48,13 +48,21 @@ function normTipo(t) {
 export async function crearViaje({ nombre, tipo, quien, entidad_id, notas } = {}, sqlArg) {
   const sql = sqlArg || await getSql();
   await ensureViajesSchema(sql);
+  const nom = String(nombre || 'Viaje').trim();
   if (quien) {
+    // Idempotencia: si ya hay un viaje ACTIVO con el mismo nombre para esa persona,
+    // devuélvelo tal cual (no lo cierres ni crees uno nuevo: perdería los gastos ya
+    // etiquetados). Evita el "¿iniciar viaje?" repetido que abría duplicados vacíos.
+    const yaActivo = await sql.query(
+      "select * from viajes where activo and quien=$1 and lower(nombre)=lower($2) order by creado_en desc limit 1",
+      [quien, nom]);
+    if (yaActivo[0]) return { ...yaActivo[0], _ya_existia: true };
     await sql.query("update viajes set activo=false, fecha_fin=coalesce(fecha_fin, current_date) where activo and quien=$1", [quien]);
   }
   const rows = await sql.query(
     `insert into viajes (nombre, tipo, quien, entidad_id, notas, activo)
      values ($1,$2,$3,$4,$5,true) returning *`,
-    [String(nombre || 'Viaje').trim(), normTipo(tipo), quien || null, entidad_id || null, notas || null]);
+    [nom, normTipo(tipo), quien || null, entidad_id || null, notas || null]);
   return rows[0];
 }
 

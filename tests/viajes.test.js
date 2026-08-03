@@ -22,6 +22,11 @@ function fakeDb() {
       const v = { id: seq++, nombre: params[0], tipo: params[1], quien: params[2], entidad_id: params[3], notas: params[4], activo: true };
       viajes.push(v); return [v];
     }
+    if (t.includes('lower(nombre)=lower(')) {
+      // Idempotencia de crearViaje: activo + mismo quien + mismo nombre.
+      return viajes.filter((v) => v.activo && v.quien === params[0]
+        && String(v.nombre).toLowerCase() === String(params[1]).toLowerCase()).slice(-1);
+    }
     if (t.includes('from viajes where activo and quien')) {
       return viajes.filter((v) => v.activo && v.quien === params[0]).slice(-1);
     }
@@ -40,6 +45,18 @@ test('crearViaje: normaliza el tipo (familiar → personal)', async () => {
   assert.equal(v1.tipo, 'negocios');
   const v2 = await crearViaje({ nombre: 'Playa', tipo: 'familiar', quien: 'Luis' }, db);
   assert.equal(v2.tipo, 'personal');
+});
+
+test('crearViaje idempotente: re-iniciar el mismo nombre activo NO abre duplicado', async () => {
+  resetViajesSchemaParaTests();
+  const db = fakeDb();
+  const v1 = await crearViaje({ nombre: 'Nicaragua y México', quien: 'Luis' }, db);
+  const v2 = await crearViaje({ nombre: 'nicaragua y mexico'.replace('mexico', 'méxico'), quien: 'Luis' }, db);
+  // Mismo nombre (case-insensitive) → devuelve el existente, marca _ya_existia, no crea otro.
+  assert.equal(v2.id, v1.id);
+  assert.equal(v2._ya_existia, true);
+  assert.equal(db.viajes.length, 1);
+  assert.equal(db.viajes.filter((v) => v.activo).length, 1);
 });
 
 test('un solo viaje activo por persona: iniciar otro cierra el anterior', async () => {

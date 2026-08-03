@@ -177,7 +177,7 @@ async function load() {
   try {
     const [res, movsRes, resAnterior] = await Promise.all([
       getResumen({ periodo, ...q }),
-      getMovimientos({ desde, hasta, limit: 20, ...q }),
+      getMovimientos({ desde, hasta, limit: 20, excluir_viajes: 1, ...q }),
       getResumen({ periodo: periodoAnterior, ...q }),
     ]);
     const total = Number(res.total) || 0;

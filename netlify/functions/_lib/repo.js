@@ -346,7 +346,9 @@ export async function queryResumen({ desde, hasta, categoria, quien }, sqlArg) {
   // registrarMovimiento/parseMontoCOP, pero esto protege el resumen igual.
   // `beneficiario <> 'empresa'` excluye gastos de iWin (tarjeta Jeeves usada para
   // costos de la empresa): se rastrean pero NO cuentan en el presupuesto familiar.
-  let filtro = "fecha >= $1 and fecha <= $2 and coalesce(tipo,'gasto') <> 'transferencia' and coalesce(moneda,'COP') = 'COP' and not coalesce(anulado,false) and coalesce(monto::text,'') <> 'NaN' and coalesce(beneficiario,'familia') <> 'empresa'";
+  // `viaje_id is null` excluye los gastos de VIAJE: se reportan aparte (en el
+  // resumen del viaje) y NO se suman a los gastos familiares del mes.
+  let filtro = "fecha >= $1 and fecha <= $2 and coalesce(tipo,'gasto') <> 'transferencia' and coalesce(moneda,'COP') = 'COP' and not coalesce(anulado,false) and coalesce(monto::text,'') <> 'NaN' and coalesce(beneficiario,'familia') <> 'empresa' and viaje_id is null";
   if (categoria) { params.push(`%${categoria.toLowerCase()}%`); filtro += ` and lower(categoria) like $${params.length}`; }
   if (quien) { params.push(`%${quien.toLowerCase()}%`); filtro += ` and lower(coalesce(quien_pago,'')) like $${params.length}`; }
   const agg = await sql.query(
@@ -1671,10 +1673,11 @@ export async function getUsuarioNombrePorEmail(email, sqlArg) {
 }
 
 /** Lista/busca movimientos (para consultas puntuales, SilvIA y dashboard). */
-export async function queryMovimientos({ desde, hasta, categoria, quien, texto, tipoGasto, limit = 50 }, sqlArg) {
+export async function queryMovimientos({ desde, hasta, categoria, quien, texto, tipoGasto, excluirViajes, limit = 50 }, sqlArg) {
   const sql = sqlArg || await getSql();
   await ensureCorreccionSchema(sql);
   await ensureTipoGastoSchema(sql);
+  await ensureViajesSchema(sql); // columna viaje_id
   const params = [];
   const cond = ['not coalesce(anulado,false)'];
   if (desde) { params.push(desde); cond.push(`fecha >= $${params.length}`); }
@@ -1683,6 +1686,9 @@ export async function queryMovimientos({ desde, hasta, categoria, quien, texto, 
   if (quien) { params.push(`%${quien.toLowerCase()}%`); cond.push(`lower(coalesce(quien_pago,'')) like $${params.length}`); }
   if (texto) { params.push(`%${texto.toLowerCase()}%`); cond.push(`lower(descripcion) like $${params.length}`); }
   if (tipoGasto) { params.push(String(tipoGasto).toLowerCase()); cond.push(`tipo_gasto = $${params.length}`); }
+  // Gastos de viaje: se excluyen del Panel familiar (para cuadrar con el total),
+  // pero el ledger completo ("Ver movimientos") los sigue mostrando.
+  if (excluirViajes) cond.push('viaje_id is null');
   const where = cond.length ? `where ${cond.join(' and ')}` : '';
   params.push(Math.min(Number(limit) || 50, 500));
   const rows = await sql.query(
