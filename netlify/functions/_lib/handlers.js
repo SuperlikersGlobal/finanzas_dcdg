@@ -60,6 +60,7 @@ import {
 import { crearSolicitudMejora, listarSolicitudesAbiertas } from './backlog.js';
 import { anularMovimientoCompleto, recategorizarMovimiento } from './corregir.js';
 import { hoyISO, parseMonto } from '../../../app/src/utils/formatters.js';
+import { categoriasConFallback } from './config-datos.js';
 
 const CONFIG_GITHUB_RE = /Configura GITHUB_TOKEN_FINANZAS/;
 
@@ -594,13 +595,19 @@ export async function pwaCorregirMovimientoHandler(req) {
   }
 }
 
-/** Catálogos para el formulario de ingresos (entidades, terceros, cédulas). Auth Google. */
+/**
+ * Catálogos para la PWA: entidades/terceros/cédulas (formulario de ingresos) y
+ * categorías/subcategorías de gasto (Fase 1.5, config-como-datos — DB primero,
+ * fallback a `CATS` si Postgres no responde/aún no se sembró). Auth Google.
+ */
 export async function pwaCatalogosHandler(req) {
   const bearer = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
   try { await resolvePwaUser(bearer); } catch (e) { return bad(e.message, e.status || 401); }
   try {
-    const [entidades, terceros] = await Promise.all([listEntidades(), listTerceros()]);
-    return ok({ ok: true, entidades, terceros, cedulas: CEDULAS });
+    const [entidades, terceros, categorias] = await Promise.all([
+      listEntidades(), listTerceros(), categoriasConFallback(),
+    ]);
+    return ok({ ok: true, entidades, terceros, cedulas: CEDULAS, categorias });
   } catch (e) {
     return bad(e.message, 422);
   }
