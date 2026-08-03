@@ -1944,3 +1944,85 @@ export async function upsertPresupuesto({ categoria, anio, mes, monto_ptto }, sq
   );
   return rows[0];
 }
+
+// ---------------------------------------------------------------------------
+// Cierre mensual (issue #92, T12b, sub-issue de #52). Congela los asientos de
+// un periodo: `crearAsiento` (asientos.js) rechaza asientos con fecha dentro
+// de un periodo cerrado — los ajustes van con fecha del mes siguiente.
+// Esquema nuevo vía DDL idempotente en runtime (sin `.sql` manual). SENSIBLE:
+// PR en borrador para aprobación de Luis (ver AUTOBUILD.md, candado).
+// `entidad_id = 0` es el sentinel de "cierre global" (toda la familia);
+// cerrar una entidad puntual no cierra las demás.
+// ---------------------------------------------------------------------------
+let _cierresSchemaPromise = null;
+
+/** Crea (si no existe) `periodos_cerrados`. Memoizado. */
+export async function ensureCierresSchema(sqlArg) {
+  if (!_cierresSchemaPromise) {
+    _cierresSchemaPromise = aplicarCierresSchema(sqlArg)
+      .catch((e) => { _cierresSchemaPromise = null; throw e; }); // reintentable si falló
+  }
+  return _cierresSchemaPromise;
+}
+
+async function aplicarCierresSchema(sqlArg) {
+  const sql = sqlArg || await getSql();
+  await sql.query(`
+    create table if not exists periodos_cerrados (
+      id serial primary key,
+      anio int not null,
+      mes int not null,
+      entidad_id bigint not null default 0,
+      cerrado_por text,
+      cerrado_en timestamptz not null default now(),
+      unique (anio, mes, entidad_id)
+    )
+  `, []);
+}
+
+/** Solo para tests: fuerza a que la próxima llamada vuelva a intentar el DDL. */
+export function resetCierresSchemaParaTests() {
+  _cierresSchemaPromise = null;
+}
+
+/** Lista los periodos cerrados (opcionalmente filtra por año). */
+export async function listPeriodosCerrados({ anio } = {}, sqlArg) {
+  await ensureCierresSchema(sqlArg);
+  const sql = sqlArg || await getSql();
+  if (anio) {
+    return sql.query('select * from periodos_cerrados where anio = $1 order by anio desc, mes desc, entidad_id asc', [Number(anio)]);
+  }
+  return sql.query('select * from periodos_cerrados order by anio desc, mes desc, entidad_id asc', []);
+}
+
+/** ¿Está cerrado ese (anio,mes) para esta entidad (o de forma global)? */
+export async function estaPeriodoCerrado({ anio, mes, entidad_id }, sqlArg) {
+  await ensureCierresSchema(sqlArg);
+  const sql = sqlArg || await getSql();
+  const eid = Number(entidad_id) || 0;
+  const rows = await sql.query(
+    'select 1 from periodos_cerrados where anio = $1 and mes = $2 and entidad_id in (0, $3) limit 1',
+    [Number(anio), Number(mes), eid]
+  );
+  return rows.length > 0;
+}
+
+/** Cierra un periodo (idempotente: si ya estaba cerrado, devuelve el existente). */
+export async function cerrarPeriodo({ anio, mes, entidad_id, cerrado_por }, sqlArg) {
+  await ensureCierresSchema(sqlArg);
+  const sql = sqlArg || await getSql();
+  const eid = Number(entidad_id) || 0;
+  const rows = await sql.query(
+    `insert into periodos_cerrados (anio, mes, entidad_id, cerrado_por)
+     values ($1, $2, $3, $4)
+     on conflict (anio, mes, entidad_id) do nothing
+     returning *`,
+    [Number(anio), Number(mes), eid, cerrado_por || null]
+  );
+  if (rows[0]) return { ...rows[0], ya_estaba_cerrado: false };
+  const existente = await sql.query(
+    'select * from periodos_cerrados where anio = $1 and mes = $2 and entidad_id = $3',
+    [Number(anio), Number(mes), eid]
+  );
+  return { ...(existente[0] || {}), ya_estaba_cerrado: true };
+}

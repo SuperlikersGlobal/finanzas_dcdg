@@ -32,6 +32,7 @@ import { buildSystemPrompt } from '../../../app/src/config/prompt.js';
 import { parseCsvExtracto } from './extractos.js';
 import { parseExtractoPdfText } from './extracto-pdf.js';
 import { crearAsiento } from './asientos.js';
+import { listPeriodosCerrados, cerrarPeriodo } from './repo.js';
 import { construirApertura } from './apertura.js';
 import { contabilizarMovimiento, contabilizarIngreso } from './contabilizar.js';
 import { mayorCuenta, balanceComprobacion } from './mayor.js';
@@ -768,6 +769,44 @@ export async function pwaAperturaHandler(req) {
       lineas, idempotency_key: `apertura:${entidad_id || 'todas'}:${fecha}`,
     });
     return ok(r);
+  } catch (e) {
+    return bad(e.message, 422);
+  }
+}
+
+/**
+ * Cierre mensual (issue #92, T12b, sub-issue de #52). Congela los asientos de
+ * un periodo — `crearAsiento` rechaza fechas dentro de un periodo cerrado.
+ * Auth Google.
+ *   GET  /api/pwa-cierre?anio= → lista periodos cerrados (equipo, lectura).
+ *   POST /api/pwa-cierre { anio, mes, entidad_id? } → cierra el periodo
+ *        (idempotente). SOLO owners.
+ */
+export async function pwaCierreHandler(req) {
+  const bearer = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  let auth;
+  try { auth = await verifyFinanceUser(bearer); } catch (e) { return bad(e.message, e.status || 401); }
+
+  if (req.method === 'GET') {
+    const url = new URL(req.url);
+    try {
+      const periodos = await listPeriodosCerrados({ anio: url.searchParams.get('anio') });
+      return ok({ ok: true, periodos });
+    } catch (e) {
+      return bad(e.message, 422);
+    }
+  }
+
+  if (req.method !== 'POST') return bad('Método no permitido', 405);
+  if (!esOwner(auth.email)) return bad('Solo Luis o Carolina pueden cerrar un periodo.', 403);
+
+  const body = await parseBody(req);
+  const anio = Number(body.anio);
+  const mes = Number(body.mes);
+  if (!anio || !mes || mes < 1 || mes > 12) return bad('anio y mes (1-12) son requeridos');
+  try {
+    const r = await cerrarPeriodo({ anio, mes, entidad_id: body.entidad_id, cerrado_por: auth.email });
+    return ok({ ok: true, periodo: r });
   } catch (e) {
     return bad(e.message, 422);
   }

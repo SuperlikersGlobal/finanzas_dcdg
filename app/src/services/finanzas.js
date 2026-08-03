@@ -220,3 +220,9 @@ export const getSolicitudes = () => request('/api/pwa-solicitudes');
 
 /** Envía una solicitud de mejora nueva (crea el issue en GitHub). Solo owners. */
 export const crearSolicitud = (body) => request('/api/pwa-solicitudes', { method: 'POST', body });
+
+/** Cierre mensual (issue #92): lista los periodos cerrados. Opcional {anio}. */
+export const getPeriodosCerrados = (params = {}) => request('/api/pwa-cierre', { params });
+
+/** Cierra un periodo (congela sus asientos). Solo owners, sensible. */
+export const cerrarPeriodo = (body) => request('/api/pwa-cierre', { method: 'POST', body });

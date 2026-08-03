@@ -335,8 +335,6 @@ html,body{height:100%;font-family:var(--font-body);background:var(--bg);color:va
   <div class="card" style="align-items:center;text-align:center">
     <div id="gsi-button" style="display:flex;justify-content:center;min-height:44px"></div>
     <div id="login-msg" class="empty" style="margin-top:10px"></div>
-  </div>
-</div>
 
 <!-- ── SETUP ── -->
 <div class="scr" id="scr-setup">
@@ -1041,6 +1039,33 @@ html,body{height:100%;font-family:var(--font-body);background:var(--bg);color:va
   <button class="btn btn-s" data-go="home">← Volver</button>
 </div>
 
+<!-- ── CIERRE MENSUAL (T12b, issue #92, SENSIBLE) ── -->
+<div class="scr" id="scr-cierre">
+  <div class="card">
+    <div class="card-ttl">Cerrar un periodo</div>
+    <div style="font-size:12px;color:var(--gray-d);margin-bottom:6px">Congela los asientos de ese mes: no se podrán registrar ni ajustar con fecha ahí — los ajustes van con fecha del mes siguiente.</div>
+    <div class="row2" style="gap:8px">
+      <div class="fld"><label>Año</label><input type="number" id="cierre-anio" placeholder="2026"></div>
+      <div class="fld">
+        <label>Mes</label>
+        <select id="cierre-mes">
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+      </div>
+    </div>
+    <div id="cierre-msg" style="font-size:12px;margin-top:6px;font-weight:600"></div>
+    <button class="btn btn-d" data-act="cerrarPeriodo" style="margin-top:8px">🔒 Cerrar periodo</button>
+  </div>
+  <div class="card">
+    <div class="card-ttl">Periodos cerrados</div>
+    <div id="cierre-lista"><div class="empty">Cargando…</div></div>
+  </div>
+  <button class="btn btn-s" data-go="home">← Volver</button>
+</div>
+
 <!-- ── TEXT INPUT ── -->
 <div class="scr" id="scr-text">
   <div class="card">
@@ -1271,6 +1296,7 @@ html,body{height:100%;font-family:var(--font-body);background:var(--bg);color:va
     <button class="mas-item" data-go="presupuesto"><div class="mas-ico">📊</div><div class="mas-txt"><strong>Presupuesto</strong><span>PTTO vs. ejecutado por categoría</span></div></button>
     <button class="mas-item" data-go="cierre-mes"><div class="mas-ico">🗓️</div><div class="mas-txt"><strong>Cierre del mes</strong><span>Ritual de revisión de la pareja</span></div></button>
     <button class="mas-item" data-go="exports"><div class="mas-ico">📥</div><div class="mas-txt"><strong>Exportar CSV</strong><span>Reportes contables</span></div></button>
+    <button class="mas-item" data-go="cierre"><div class="mas-ico">🔒</div><div class="mas-txt"><strong>Cierre mensual</strong><span>Congela los asientos de un periodo</span></div></button>
   </div>
   <div class="mas-group">
     <div class="mas-group-ttl">Sistema</div>
