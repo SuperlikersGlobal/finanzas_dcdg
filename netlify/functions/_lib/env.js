@@ -29,6 +29,9 @@ export const config = {
   sheetGastos: () => env('SHEET_GASTOS', 'Registro Gastos'),
   sheetEmpresas: () => env('SHEET_EMPRESAS', 'EMPRESAS'),
   sheetCuentas: () => env('SHEET_CUENTAS', '⚙️ CUENTAS'),
+  // Hoja dedicada al backup completo (issue #41) — separada del espejo
+  // incremental de Registro Gastos/EMPRESAS, para no interferir con esos.
+  sheetBackup: () => env('SHEET_BACKUP', '⚙️ BACKUP DB'),
 
   // Service Account
   saEmail: () => requireEnv('GOOGLE_SA_EMAIL'),

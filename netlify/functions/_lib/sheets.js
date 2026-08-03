@@ -87,22 +87,40 @@ async function authedFetch(url, options = {}) {
   return res.json();
 }
 
-let _sheetIdCache = null;
+let _sheetMetaCache = null;
+
+/** Metadata (sheetId + dimensiones) de todas las hojas, con cache. */
+async function loadSheetMetaCache() {
+  const id = config.spreadsheetId();
+  if (!_sheetMetaCache) {
+    const meta = await authedFetch(
+      `${SHEETS_BASE}/${id}?fields=sheets(properties(sheetId,title,gridProperties(rowCount,columnCount)))`
+    );
+    _sheetMetaCache = new Map(
+      (meta.sheets || []).map((s) => [s.properties.title, {
+        sheetId: s.properties.sheetId,
+        rowCount: s.properties.gridProperties?.rowCount || 0,
+        columnCount: s.properties.gridProperties?.columnCount || 0,
+      }])
+    );
+  }
+  return _sheetMetaCache;
+}
 
 /** sheetId numérico por nombre (con cache). */
 export async function getSheetId(sheetName) {
-  const id = config.spreadsheetId();
-  if (!_sheetIdCache) {
-    const meta = await authedFetch(
-      `${SHEETS_BASE}/${id}?fields=sheets(properties(sheetId,title))`
-    );
-    _sheetIdCache = new Map(
-      (meta.sheets || []).map((s) => [s.properties.title, s.properties.sheetId])
-    );
-  }
-  const sid = _sheetIdCache.get(sheetName);
-  if (sid == null) throw new Error(`Hoja no encontrada: "${sheetName}"`);
-  return sid;
+  const cache = await loadSheetMetaCache();
+  const meta = cache.get(sheetName);
+  if (meta == null) throw new Error(`Hoja no encontrada: "${sheetName}"`);
+  return meta.sheetId;
+}
+
+/** sheetId + dimensiones actuales (rowCount/columnCount) por nombre. */
+export async function getSheetMeta(sheetName) {
+  const cache = await loadSheetMetaCache();
+  const meta = cache.get(sheetName);
+  if (meta == null) throw new Error(`Hoja no encontrada: "${sheetName}"`);
+  return meta;
 }
 
 function toRowData(values) {
@@ -151,6 +169,52 @@ export async function readRange(rangeA1) {
     `${SHEETS_BASE}/${id}/values/${encodeURIComponent(rangeA1)}`
   );
   return data.values || [];
+}
+
+/**
+ * Completa `rows` con celdas vacías hasta cubrir `existingRowCount`/`existingColCount`
+ * (la dimensión que ya tenía la hoja). Así, al reemplazar celda por celda desde A1,
+ * queda "limpio" lo que sobraba de una corrida anterior con más filas/columnas —
+ * sin depender de un `clear` por A1 (bug de emoji en nombres de hoja, ver arriba).
+ * Pura, sin red: exportada para tests.
+ */
+export function padRowsForReplace(rows, existingRowCount = 0, existingColCount = 0) {
+  const maxCols = rows.reduce((m, r) => Math.max(m, r.length), 0);
+  const cols = Math.max(maxCols, existingColCount, 1);
+  const out = rows.map((r) => {
+    const row = r.slice();
+    while (row.length < cols) row.push('');
+    return row;
+  });
+  while (out.length < existingRowCount) out.push(new Array(cols).fill(''));
+  return out;
+}
+
+/**
+ * Reemplaza TODO el contenido de una hoja desde A1 (para backups: cada corrida
+ * sobreescribe, no acumula). Emoji-safe (batchUpdate + sheetId, igual que
+ * `appendRow`). Pensada para una hoja dedicada que solo escribe este backup.
+ * @param {string} sheetName
+ * @param {Array<Array>} rows  filas (incluye encabezados si los necesitas)
+ */
+export async function replaceSheetContent(sheetName, rows) {
+  const id = config.spreadsheetId();
+  const meta = await getSheetMeta(sheetName);
+  const padded = padRowsForReplace(rows, meta.rowCount, meta.columnCount);
+  return authedFetch(`${SHEETS_BASE}/${id}:batchUpdate`, {
+    method: 'POST',
+    body: JSON.stringify({
+      requests: [
+        {
+          updateCells: {
+            range: { sheetId: meta.sheetId, startRowIndex: 0, startColumnIndex: 0 },
+            rows: padded.map(toRowData),
+            fields: 'userEnteredValue',
+          },
+        },
+      ],
+    }),
+  });
 }
 
 // Exportado para tests: permite inyectar dependencias sin red real.

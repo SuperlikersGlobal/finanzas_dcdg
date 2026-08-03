@@ -1803,6 +1803,11 @@ El formato: fecha · qué se añadió · PR · estado (✅ en firme / 🔎 en re
   de más, se avisa en vez de fallar en silencio. Límite exacto de tamaño y
   soporte multi-página quedan como decisiones abiertas; el lado SilvIA/WhatsApp
   queda fuera (otro repo). 🤖 PR #54.
+- Export programado: Netlify Scheduled Function diaria que vuelca una foto
+  completa de `movimientos`/`empresas_mov`/`ingresos` a una hoja dedicada
+  (`⚙️ BACKUP DB`), separada del espejo incremental de `Registro Gastos`/
+  `EMPRESAS` — red de seguridad si ese espejo se desalinea. Solo lectura de
+  la DB, reemplaza el contenido de la hoja en cada corrida. 🤖 PR #55.
 - Cargador de extractos bancarios en CSV (botón 🧾): sube fecha/descripción/
   monto de una cuenta y un periodo y los deja guardados en `extracto_lineas`
   (`sin_conciliar`) — primer paso de la conciliación (docs/conciliacion.md);

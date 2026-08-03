@@ -985,6 +985,50 @@ export async function queryExtractoLineas({ extracto_id, limit = 500 } = {}, sql
 }
 
 // ---------------------------------------------------------------------------
+// Backup completo (issue #41) — foto entera de las tablas principales para el
+// export programado al Sheet dedicado (`⚙️ BACKUP DB`). Sin filtros ni límite:
+// a diferencia de `query*`, estas leen TODO (uso exclusivo del backup, no de
+// endpoints con datos de usuario en vivo).
+// ---------------------------------------------------------------------------
+
+/** Todos los movimientos, sin filtrar (para el backup completo). */
+export async function listAllMovimientos(sqlArg) {
+  const sql = sqlArg || await getSql();
+  return sql.query(
+    `select id, fecha, tipo, categoria, subcategoria, descripcion, monto, moneda,
+            metodo_pago, quien_pago, tarjeta, cuenta_destino, notas, origen,
+            idempotency_key, creado_en, actualizado_en
+       from movimientos
+      order by id`,
+    []
+  );
+}
+
+/** Todos los movimientos empresa↔familia, sin filtrar (para el backup completo). */
+export async function listAllEmpresasMov(sqlArg) {
+  const sql = sqlArg || await getSql();
+  return sql.query(
+    `select id, empresa, flujo, mes, anio, concepto, titular, monto, moneda,
+            estado, origen, movimiento_id, creado_en
+       from empresas_mov
+      order by id`,
+    []
+  );
+}
+
+/** Todos los ingresos, sin filtrar (para el backup completo). */
+export async function listAllIngresos(sqlArg) {
+  const sql = sqlArg || await getSql();
+  return sql.query(
+    `select id, entidad_id, fecha, cedula, concepto, tercero_id, cuenta_id, monto, moneda,
+            retencion_fuente, actividad, notas, origen, idempotency_key, creado_en
+       from ingresos
+      order by id`,
+    []
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Motor de cruce de conciliación (fase 2, docs/conciliacion.md, issue #39).
 // Solo lectura salvo `confirmarConciliacion` (la única escritura: siempre a
 // pedido explícito del usuario, tras revisar la propuesta).
