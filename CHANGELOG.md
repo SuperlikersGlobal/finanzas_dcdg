@@ -8,6 +8,31 @@ El formato: fecha · qué se añadió · PR · estado (✅ en firme / 🔎 en re
 
 ---
 
+## 2026-08-03 (autobuild, corrida nueva)
+- 🔎 **Sin item elegible — mismo estado que la corrida del 2026-07-27, con otro
+  salto de ~1 semana en la cadencia** (de nuevo muy por encima de las ~3h que
+  describe `AUTOBUILD.md` — vale la pena que Luis revise el disparador
+  programado de esta rutina).
+  - `#40`/`#41`/`#92` siguen con `autobuild-espera` y sus PR borrador
+    `#58`/`#55`/`#96` sin comentario nuevo de Luis — ya **~27 días**
+    esperando revisión (creados 07-07/07-08). No agrego una cuarta propuesta
+    encima de estas tres sin revisar (mismo criterio de las corridas
+    anteriores: cero issues `propuesta` abiertos, y no tiene sentido apilar
+    más mientras estas siguen quietas).
+  - `#52` sigue siendo el issue "padre" ya dividido (`#91` fusionado, `#92`
+    en espera con PR abierto); tomarlo directo duplicaría ese trabajo. Su
+    dependencia (T5 `#48`) sigue fusionada en `main`.
+  - Revisé también la épica **#111** (contabilidad familiar "nuestro/tuyo/
+    mío"): en realidad ya está **completa** — sus 7 sub-issues (`#112`-`#118`,
+    incluyendo `E` Metas `#117` y `G` Cierre-ritual) figuran fusionadas en
+    este mismo CHANGELOG. No queda ahí ningún ítem sin construir para
+    proponer.
+  - El PR de Autofix `#211` sigue en borrador sin comentario nuevo (creado
+    07-12, ~22 días).
+  - `AUTOBUILD_NOTIFY_URL`/`AUTOBUILD_NOTIFY_SECRET` no están en el entorno
+    de esta corrida — este registro + la notificación de la rutina (push/
+    email) son el aviso disponible.
+
 ## 2026-07-27 (autobuild, corrida nueva)
 - 🔎 **Sin item elegible — cola sin novedad de Luis, gap de la rutina programada
   otra vez de ~7 días.** Reconfirmé la cola `autobuild` desde cero:
