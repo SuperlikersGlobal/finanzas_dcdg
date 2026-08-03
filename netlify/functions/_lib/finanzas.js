@@ -200,10 +200,15 @@ export async function registrarMovimiento(mov = {}) {
 
   // Viaje: un viaje_id explícito manda; si no, se auto-etiqueta al viaje ACTIVO
   // de la persona SOLO para lo que ella reporta (SilvIA/App), no la captura
-  // automática por correo (que traería gastos del hogar al viaje).
+  // automática por correo (que traería gastos del hogar al viaje). Además, NO se
+  // auto-etiquetan las categorías del HOGAR/obligaciones recurrentes (energía,
+  // arriendo, cuotas, seguros, educación…): esas ocurren estés o no de viaje y no
+  // son gasto del viaje aunque caigan mientras está activo (se pueden mover a mano
+  // con la acción agregar/quitar si hiciera falta).
+  const CATEG_NO_VIAJE = /servicios? p[úu]blicos|vivienda|cr[eé]ditos? y tarjetas|seguros|medicina prepagada|educaci[oó]n|gastos bancarios/i;
   let viaje_id = null;
   if (mov.viaje_id) viaje_id = Number(mov.viaje_id) || null;
-  else if (mov.viaje_id === undefined && (origen === 'SilvIA' || origen === 'App')) {
+  else if (mov.viaje_id === undefined && (origen === 'SilvIA' || origen === 'App') && !CATEG_NO_VIAJE.test(categoria || '')) {
     try { const v = await viajeActivo(titular); if (v) viaje_id = v.id; } catch (_) { /* sin viaje: sigue */ }
   }
 

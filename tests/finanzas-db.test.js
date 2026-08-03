@@ -8,7 +8,7 @@ import { registrarMovimiento, resumen } from '../netlify/functions/_lib/finanzas
 // consultas que emite el flujo de registro (insert/on-conflict, dedup, update,
 // empresas, eventos). Simula la restricción UNIQUE(idempotency_key).
 // ---------------------------------------------------------------------------
-function fakeDb({ cuentasMeta = [] } = {}) {
+function fakeDb({ cuentasMeta = [], viajeActivo = null } = {}) {
   const movimientos = [];
   const empresas = [];
   let seq = 0;
@@ -17,6 +17,9 @@ function fakeDb({ cuentasMeta = [] } = {}) {
   async function query(text, params = []) {
     const t = text.replace(/\s+/g, ' ').trim();
 
+    if (t.startsWith('select * from viajes where activo')) {
+      return viajeActivo ? [viajeActivo] : [];
+    }
     if (t.startsWith('insert into movimientos')) {
       // cols: fecha,tipo,categoria,subcategoria,descripcion,monto,moneda,
       //       metodo_pago,quien_pago,tarjeta,cuenta_destino,notas,origen,idempotency_key,
@@ -31,6 +34,7 @@ function fakeDb({ cuentasMeta = [] } = {}) {
         cuenta_destino: params[10], notas: params[11], origen: params[12], idempotency_key: key,
         tipo_gasto: params[16], tipo_gasto_persona: params[17], tipo_gasto_auto: params[18],
         monto_destino: params[19], moneda_destino: params[20],
+        viaje_id: params[21] ?? null, beneficiario: params[22] ?? 'familia',
         creado_en: '2026-07-05T12:00:00Z', actualizado_en: null,
       };
       movimientos.push(row);
@@ -347,6 +351,30 @@ test('gasto en MXN con tarjeta Jeeves + beneficiario empresa: preserva la moneda
   // beneficiario=empresa (costo de iWin) → NO adelanto de honorarios.
   assert.ok(!r.adelanto_empresas, 'no debe generar adelanto iWin');
   assert.equal(db._empresas.length, 0);
+
+  setSqlForTests(null);
+});
+
+test('viaje activo: auto-etiqueta un gasto normal pero NO uno de categoría del hogar', async () => {
+  const viaje = { id: 77, nombre: 'Nicaragua y México', tipo: 'negocios', quien: 'Luis', activo: true };
+  const db = fakeDb({ viajeActivo: viaje });
+  setSqlForTests(db);
+
+  // Gasto de viaje típico (restaurante) reportado por SilvIA → se etiqueta al viaje.
+  const r1 = await registrarMovimiento({
+    tipo: 'gasto', monto: 21100, descripcion: 'Café aeropuerto', categoria: 'Alimentación',
+    subcategoria: 'Restaurante', fecha: '2026-07-30', quien_pago: 'Luis', metodo_pago: 'Efectivo', origen: 'SilvIA',
+  });
+  assert.equal(r1.registrado, true);
+  assert.equal(db._movimientos.at(-1).viaje_id, 77);
+
+  // Pago de energía del apto (Servicios Públicos) durante el viaje → NO al viaje.
+  const r2 = await registrarMovimiento({
+    tipo: 'pago', monto: 1180010, descripcion: 'Air-e energía apto', categoria: 'Servicios Públicos',
+    subcategoria: 'Energía', fecha: '2026-07-30', quien_pago: 'Luis', metodo_pago: 'Bcol 0965', origen: 'SilvIA',
+  });
+  assert.equal(r2.registrado, true);
+  assert.equal(db._movimientos.at(-1).viaje_id, null, 'la energía del hogar no debe entrar al viaje');
 
   setSqlForTests(null);
 });

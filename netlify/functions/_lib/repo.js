@@ -371,6 +371,23 @@ export async function queryResumen({ desde, hasta, categoria, quien }, sqlArg) {
   return { total: agg[0].total, movimientos: agg[0].n, por_categoria: desglose, por_descripcion: porDescripcion };
 }
 
+/**
+ * Asigna (o QUITA, con `viajeId` null) el viaje de un movimiento — sin anularlo.
+ * Sirve para sacar del viaje un gasto que se auto-etiquetó por error (p. ej. el
+ * recibo de energía del apto durante el viaje) dejándolo como gasto normal, o
+ * para meter al viaje uno que quedó fuera. Devuelve la fila actualizada.
+ */
+export async function asignarViajeMovimiento(id, viajeId, sqlArg) {
+  const sql = sqlArg || await getSql();
+  await ensureViajesSchema(sql);
+  const rows = await sql.query(
+    `update movimientos set viaje_id=$2, actualizado_en=now()
+      where id=$1 and not coalesce(anulado,false)
+      returning id, fecha, descripcion, monto, coalesce(moneda,'COP') moneda, categoria, viaje_id`,
+    [Number(id), viajeId == null ? null : Number(viajeId)]);
+  return rows[0] || null;
+}
+
 // ---------------------------------------------------------------------------
 // Plan de cuentas (PUC simplificado) — base de la partida doble.
 // ---------------------------------------------------------------------------

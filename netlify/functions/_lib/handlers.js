@@ -20,6 +20,7 @@ import {
   queryAsientos, movimientosSinAsiento, ingresosSinAsiento,
   insertMovimiento, getExtractoLinea, marcarLineaMaterializada,
   listCuentasMeta, upsertCuentaMeta, insertCostoActividad, buscarMovimientosPorMonto,
+  asignarViajeMovimiento,
 } from './repo.js';
 import { deriveIngresoKey, deriveAporteHogarKey, deriveCostoActividadKey } from './idempotency.js';
 import { reporteCostosActividad } from './costos.js';
@@ -41,7 +42,7 @@ import { patrimonioPorPersona, miPatrimonio } from './patrimonio.js';
 import { listarMetasConProgreso, crearMeta, editarMeta, CATEGORIAS_META } from './metas.js';
 import { reportePresupuesto, guardarPresupuesto } from './presupuesto.js';
 import { proponerCruces, cuadreExtracto, detectarDiscrepancias, VENTANA_DIAS_DEFAULT, toISODate } from './conciliacion.js';
-import { crearViaje, cerrarViaje, resumenViaje, listViajes, resumenTarjeta } from './viajes.js';
+import { crearViaje, cerrarViaje, resumenViaje, listViajes, resumenTarjeta, viajeActivo } from './viajes.js';
 import { proponerBackfillExtracto } from './backfill.js';
 import { reporteAportes } from './aportes.js';
 import { reporteRentaAnual } from './renta-anual.js';
@@ -285,6 +286,42 @@ export function makeViajeHandler() {
       }
       if (accion === 'listar') {
         return ok({ ok: true, viajes: await listViajes({ soloActivos: !!body.activos }) });
+      }
+      // Sacar un gasto del viaje (des-etiquetar, SIN anularlo) o meterlo a un viaje.
+      if (accion === 'quitar' || accion === 'sacar' || accion === 'agregar' || accion === 'meter') {
+        const meter = accion === 'agregar' || accion === 'meter';
+        let id = Number(body.id) || null;
+        if (!id) {
+          if (body.monto == null || body.monto === '') return bad('Falta id o monto para ubicar el movimiento.');
+          const monto = parseMonto(body.monto);
+          if (!(monto > 0)) return bad('monto inválido para ubicar el movimiento.');
+          const cands = await buscarMovimientosPorMonto({ monto, texto: body.texto || body.comercio });
+          if (!cands.length) return ok({ ok: false, no_encontrado: true, mensaje: 'No encontré un movimiento reciente por ese monto.' });
+          if (cands.length > 1) {
+            return ok({
+              ok: false, ambiguo: true,
+              candidatos: cands.map((c) => ({ id: c.id, fecha: c.fecha, descripcion: c.descripcion, categoria: c.categoria, monto: c.monto })),
+              mensaje: `Hay ${cands.length} movimientos por ese monto. ¿Cuál ${meter ? 'agrego al' : 'saco del'} viaje? Dime el id.`,
+            });
+          }
+          id = cands[0].id;
+        }
+        let viajeId = null;
+        if (meter) {
+          let v = null;
+          if (body.viaje_id) { const r = await listViajes({}); v = r.find((x) => x.id === Number(body.viaje_id)) || null; }
+          else v = await viajeActivo(quien);
+          if (!v) return ok({ ok: false, mensaje: 'No hay un viaje al cual agregar el gasto (indica viaje_id o ten un viaje activo).' });
+          viajeId = v.id;
+        }
+        const row = await asignarViajeMovimiento(id, viajeId);
+        if (!row) return ok({ ok: false, mensaje: `No pude actualizar el movimiento #${id} (¿existe o está anulado?).` });
+        return ok({
+          ok: true, movimiento: row,
+          mensaje: meter
+            ? `Listo ✅ Metí el movimiento #${row.id} (${row.descripcion || row.categoria || ''}) al viaje.`
+            : `Listo ✅ Saqué del viaje el movimiento #${row.id} (${row.descripcion || row.categoria || ''}). Sigue registrado como gasto normal.`,
+        });
       }
       // resumen (default)
       const r = await resumenViaje({ viaje_id: body.viaje_id, quien });
