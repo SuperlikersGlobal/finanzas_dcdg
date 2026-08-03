@@ -8,6 +8,14 @@ El formato: fecha · qué se añadió · PR · estado (✅ en firme / 🔎 en re
 
 ---
 
+## 2026-08-03
+- **Cierre mensual** (T12b, botón 🔒 en Más, issue #92 — sub-issue de #52):
+  marca un periodo como cerrado y congela sus asientos — `crearAsiento`
+  rechaza después cualquier fecha dentro de ese mes (los ajustes van con
+  fecha del mes siguiente), en las 4 vías de creación de asientos (manual,
+  apertura, contabilización automática T4, backfill). Cerrar es idempotente;
+  solo owners pueden cerrar, lectura abierta al equipo. 🤖 PR #96. ✅
+
 ## 2026-08-03 (autobuild, corrida nueva)
 - 🔎 **Sin item elegible — mismo estado que la corrida del 2026-07-27, con otro
   salto de ~1 semana en la cadencia** (de nuevo muy por encima de las ~3h que
