@@ -290,6 +290,31 @@ html,body{height:100%;font-family:var(--font-body);background:var(--bg);color:va
 .uso-tag-fam{background:rgba(46,95,163,.14);color:#2E5FA3}
 .uso-tag-emp{background:rgba(15,110,86,.14);color:#0F6E56}
 
+/* ---- Viajes ---- */
+.vj-item{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 13px;cursor:pointer;text-align:left;margin-bottom:8px}
+.vj-item:active{transform:scale(.99)}
+.vj-item-l strong{display:block;font-size:14px;color:var(--ink)}
+.vj-item-sub{font-size:11px;color:var(--muted)}
+.vj-item-r{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.vj-chev{color:var(--muted);font-size:18px}
+.vj-badge{font-size:10px;font-weight:700;border-radius:6px;padding:2px 7px;background:var(--surface-2);color:var(--muted)}
+.vj-badge-on{background:rgba(15,110,86,.16);color:#0F6E56}
+.vj-chips{display:flex;flex-wrap:wrap;gap:6px}
+.vj-chip{background:var(--surface-2);border-radius:8px;padding:5px 10px;font-size:14px;font-weight:700;color:var(--ink)}
+.vj-chip small{font-weight:400;color:var(--muted)}
+.vj-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border)}
+.vj-row:last-child{border-bottom:none}
+.vj-amt{font-weight:700;color:var(--ink);white-space:nowrap}
+.vj-tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px}
+.vj-tag-fam{background:rgba(46,95,163,.14);color:#2E5FA3}
+.vj-tag-emp{background:rgba(15,110,86,.14);color:#0F6E56}
+.vj-mov{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
+.vj-mov:last-child{border-bottom:none}
+.vj-mov-l strong{display:block;font-size:13.5px;color:var(--ink)}
+.vj-mov-r{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.vj-sacar{font-size:11px;font-weight:700;border:1px solid var(--border);background:var(--surface-2);color:var(--gray-d);border-radius:7px;padding:3px 8px;cursor:pointer}
+.vj-sacar:active{transform:scale(.97)}
+
 /* ---- DARK MODE (cálido) ---- */
 @media(prefers-color-scheme:dark){
   :root{
@@ -615,6 +640,12 @@ html,body{height:100%;font-family:var(--font-body);background:var(--bg);color:va
     <div id="bf-list"></div>
     <button class="btn btn-p" id="bf-aceptar-todo" data-act="bfAceptarTodo" style="margin-top:10px;display:none">✓ Contabilizar estas líneas</button>
   </div>
+  <button class="btn btn-s" data-go="home">← Volver</button>
+</div>
+
+<!-- ── VIAJES (detalle de gastos por viaje) ── -->
+<div class="scr" id="scr-viajes">
+  <div id="viajes-body"></div>
   <button class="btn btn-s" data-go="home">← Volver</button>
 </div>
 
@@ -1271,6 +1302,7 @@ html,body{height:100%;font-family:var(--font-body);background:var(--bg);color:va
     <button class="mas-item" data-go="ingreso"><div class="mas-ico">💵</div><div class="mas-txt"><strong>Ingresos</strong><span>Registrar un ingreso</span></div></button>
     <button class="mas-item" data-go="transfer"><div class="mas-ico">🔁</div><div class="mas-txt"><strong>Transferencia</strong><span>Entre cuentas propias</span></div></button>
     <button class="mas-item" data-go="tarjeta"><div class="mas-ico">💳</div><div class="mas-txt"><strong>Tarjeta Jeeves</strong><span>Uso iWin: familia vs. empresa</span></div></button>
+    <button class="mas-item" data-go="viajes"><div class="mas-ico">🧳</div><div class="mas-txt"><strong>Viajes</strong><span>Detalle de gastos por viaje</span></div></button>
   </div>
   <div class="mas-group">
     <div class="mas-group-ttl">Banco y conciliación</div>

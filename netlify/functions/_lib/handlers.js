@@ -638,6 +638,49 @@ export async function pwaCorregirMovimientoHandler(req) {
 }
 
 /**
+ * Viajes para la PWA (auth Google). Lectura para todo el equipo; escritura
+ * (sacar/agregar/cerrar) solo owners.
+ *   GET  /api/pwa-viajes                 → lista de viajes.
+ *   GET  /api/pwa-viajes?viaje_id=NN     → resumen de ese viaje (rubros, pagador, movimientos).
+ *   POST { accion:'sacar'|'agregar'|'cerrar', ... }  → mutaciones (owners).
+ */
+export async function pwaViajesHandler(req) {
+  const bearer = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  let auth;
+  try { auth = await resolvePwaUser(bearer); } catch (e) { return bad(e.message, e.status || 401); }
+  try {
+    if (req.method === 'POST') {
+      if (!esOwner(auth)) return bad('Tu rol no tiene permiso para editar viajes.', 403);
+      const body = await parseBody(req);
+      const accion = String(body.accion || '').toLowerCase();
+      if (accion === 'sacar' || accion === 'quitar' || accion === 'agregar' || accion === 'meter') {
+        const id = Number(body.id);
+        if (!id) return bad('Falta el id del movimiento.');
+        const meter = accion === 'agregar' || accion === 'meter';
+        const row = await asignarViajeMovimiento(id, meter ? (Number(body.viaje_id) || null) : null);
+        if (!row) return ok({ ok: false, mensaje: `No pude actualizar el movimiento #${id}.` });
+        return ok({ ok: true, movimiento: row });
+      }
+      if (accion === 'cerrar') {
+        const v = await cerrarViaje({ viaje_id: body.viaje_id });
+        return ok({ ok: !!v, viaje: v });
+      }
+      return bad('accion inválida (sacar | agregar | cerrar)');
+    }
+    const url = new URL(req.url);
+    const viajeId = url.searchParams.get('viaje_id');
+    if (viajeId) {
+      const r = await resumenViaje({ viaje_id: viajeId });
+      if (!r) return ok({ ok: false, mensaje: 'Viaje no encontrado.' });
+      return ok({ ok: true, ...r });
+    }
+    return ok({ ok: true, viajes: await listViajes({}) });
+  } catch (e) {
+    return bad(e.message, e.status || 422);
+  }
+}
+
+/**
  * Catálogos para la PWA: entidades/terceros/cédulas (formulario de ingresos) y
  * categorías/subcategorías de gasto (Fase 1.5, config-como-datos — DB primero,
  * fallback a `CATS` si Postgres no responde/aún no se sembró). Auth Google.

@@ -69,6 +69,18 @@ export const getMovimientos = (params = {}) => request('/api/pwa-movimientos', {
 /** Uso de la tarjeta Jeeves/iWin, separado familia vs empresa, por rubro y moneda. */
 export const getUsoTarjeta = (params = {}) => request('/api/tarjeta', { params });
 
+/** Lista de viajes (activos y cerrados). */
+export const getViajes = () => request('/api/pwa-viajes');
+
+/** Resumen de un viaje: totales por moneda, por rubro, por pagador y movimientos. */
+export const getResumenViaje = (viaje_id) => request('/api/pwa-viajes', { params: { viaje_id } });
+
+/** Saca un movimiento del viaje (des-etiqueta, sin anularlo). Solo owners. */
+export const sacarDeViaje = (id) => request('/api/pwa-viajes', { method: 'POST', body: { accion: 'sacar', id } });
+
+/** Cierra un viaje activo. Solo owners. */
+export const cerrarViaje = (viaje_id) => request('/api/pwa-viajes', { method: 'POST', body: { accion: 'cerrar', viaje_id } });
+
 /** Catálogos para el formulario de ingresos (entidades, terceros, cédulas). */
 export const getCatalogos = () => request('/api/pwa-catalogos');
 
