@@ -17,7 +17,8 @@ export function formatCOP(n) {
 export function formatMoneda(n, moneda) {
   const m = String(moneda || 'COP').toUpperCase();
   if (m === 'COP') return formatCOP(n);
-  const num = (Number(n) || 0).toLocaleString('en-US');
+  // 2 decimales: evita el "US$ 17.749" (3 decimales) que se leía como "17 mil".
+  const num = (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return m === 'USD' ? `US$ ${num}` : `${m} ${num}`;
 }
 

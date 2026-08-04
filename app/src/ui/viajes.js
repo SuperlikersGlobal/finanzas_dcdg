@@ -21,14 +21,26 @@ let _sel = null;       // viaje_id abierto (detalle) o null (lista)
 let _ver = 'orig';     // 'orig' | 'COP' | 'USD'
 let _tasas = null;     // { rates, fecha } cacheado
 let _resumen = null;   // último resumen cargado (para re-render sin refetch)
+// Tasa USD→COP editable por el usuario (la TRM de la fuente puede diferir de la
+// del mercado/oficial). Persiste en el dispositivo. Si está, manda sobre la fuente.
+let _trm = Number(localStorage.getItem('dcdg_trm')) || null;
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 const esEmpresa = (p) => /iwin|empresa|reembols/i.test(String(p || ''));
 
+// Tasa USD→COP de la fuente (COP por 1 USD).
+const trmFuente = () => (_tasas && _tasas.rates && _tasas.rates.COP) || null;
+// Tasas efectivas: las de la fuente, pero con la TRM editada por el usuario si la puso.
+function tasasEfectivas() {
+  if (!_tasas || !_tasas.rates) return null;
+  const r = { ..._tasas.rates };
+  if (_trm > 0) r.COP = _trm;
+  return r;
+}
 // Convierte a la vista actual; null si falta la tasa de esa moneda.
-const conv = (monto, moneda) => convertirMoneda(monto, moneda, _ver, _tasas && _tasas.rates);
+const conv = (monto, moneda) => convertirMoneda(monto, moneda, _ver, tasasEfectivas());
 
 function listaHTML(viajes) {
   if (!viajes || !viajes.length) return '<div class="empty">Aún no hay viajes. Inícialos por SilvIA ("me voy de viaje a …").</div>';
@@ -46,8 +58,22 @@ function listaHTML(viajes) {
 
 function segHTML() {
   const b = (val, txt) => `<button class="vj-seg-b${_ver === val ? ' on' : ''}" data-ver="${val}">${txt}</button>`;
-  const fecha = (_ver !== 'orig' && _tasas && _tasas.fecha) ? `<div class="vj-seg-note">Tasa del día · ${esc(String(_tasas.fecha).slice(0, 16))}</div>` : '';
-  return `<div class="vj-seg">${b('orig', 'Original')}${b('COP', 'En COP')}${b('USD', 'En USD')}</div>${fecha}`;
+  let extra = '';
+  if (_ver !== 'orig' && _tasas) {
+    const fuente = trmFuente();
+    const val = Math.round(_trm > 0 ? _trm : (fuente || 0));
+    const nota = _trm > 0
+      ? `personalizada${fuente ? ` · fuente ${Math.round(fuente).toLocaleString('es-CO')}` : ''}`
+      : `tasa del día${_tasas.fecha ? ' · ' + esc(String(_tasas.fecha).slice(0, 16)) : ''}`;
+    extra = `<div class="vj-rate">
+      <span>1 US$ = $</span>
+      <input id="vj-trm" type="number" inputmode="numeric" step="1" min="1" value="${val}">
+      <span>COP</span>
+      ${_trm > 0 ? '<button class="vj-rate-reset" data-rate-reset title="Volver a la tasa de la fuente">↺</button>' : ''}
+      <span class="vj-seg-note" style="margin:0">${nota}</span>
+    </div>`;
+  }
+  return `<div class="vj-seg">${b('orig', 'Original')}${b('COP', 'En COP')}${b('USD', 'En USD')}</div>${extra}`;
 }
 
 // Totales: chips por moneda (orig) o un solo total convertido.
@@ -185,7 +211,15 @@ async function cambiarVista(ver) {
 export function renderViajes() {
   if (!_wired) {
     _wired = true;
+    // Edición de la tasa USD→COP: recalcula todo con el valor que ponga el usuario.
+    V('viajes-body').addEventListener('change', (e) => {
+      if (e.target && e.target.id === 'vj-trm') {
+        const v = Number(e.target.value);
+        if (v > 0) { _trm = v; localStorage.setItem('dcdg_trm', String(v)); pintarDetalle(); }
+      }
+    });
     V('viajes-body').addEventListener('click', async (e) => {
+      if (e.target.closest('[data-rate-reset]')) { _trm = null; localStorage.removeItem('dcdg_trm'); pintarDetalle(); return; }
       const ver = e.target.closest('[data-ver]');
       if (ver) { await cambiarVista(ver.dataset.ver); return; }
       const open = e.target.closest('[data-open]');
