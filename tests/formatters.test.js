@@ -20,6 +20,9 @@ test('formatMoneda: USD con prefijo US$, COP como pesos', () => {
   assert.equal(formatMoneda(45000, 'COP'), '$45.000');
   assert.equal(formatMoneda(45000, undefined), '$45.000'); // sin moneda → COP
   assert.equal(formatMoneda(3899, 'usd'), 'US$ 3,899'); // case-insensitive
+  // Otras monedas muestran su código ISO (no se confunden con pesos COP).
+  assert.equal(formatMoneda(3907.46, 'MXN'), 'MXN 3,907.46');
+  assert.equal(formatMoneda(3306, 'NIO'), 'NIO 3,306');
 });
 
 test('parseMonto: formato CO con puntos de miles', () => {

@@ -9,11 +9,16 @@ export function formatCOP(n) {
   return '$' + Math.round(num).toLocaleString('es-CO');
 }
 
-/** Formatea un monto según su moneda: COP → "$45.000"; USD → "US$ 3,899". */
+/**
+ * Formatea un monto según su moneda: COP → "$45.000"; USD → "US$ 3,899";
+ * cualquier otra (MXN, NIO, EUR…) muestra su código ISO → "MXN 3,907" para no
+ * confundirla con pesos colombianos.
+ */
 export function formatMoneda(n, moneda) {
-  return String(moneda || 'COP').toUpperCase() === 'USD'
-    ? 'US$ ' + (Number(n) || 0).toLocaleString('en-US')
-    : formatCOP(n);
+  const m = String(moneda || 'COP').toUpperCase();
+  if (m === 'COP') return formatCOP(n);
+  const num = (Number(n) || 0).toLocaleString('en-US');
+  return m === 'USD' ? `US$ ${num}` : `${m} ${num}`;
 }
 
 /**
