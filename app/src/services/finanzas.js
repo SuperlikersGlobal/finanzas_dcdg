@@ -69,6 +69,9 @@ export const getMovimientos = (params = {}) => request('/api/pwa-movimientos', {
 /** Uso de la tarjeta Jeeves/iWin, separado familia vs empresa, por rubro y moneda. */
 export const getUsoTarjeta = (params = {}) => request('/api/tarjeta', { params });
 
+/** Tasas de cambio del día (base USD): { base, fecha, rates: { COP, USD, MXN, … } }. */
+export const getTasas = () => request('/api/pwa-tasas');
+
 /** Lista de viajes (activos y cerrados). */
 export const getViajes = () => request('/api/pwa-viajes');
 

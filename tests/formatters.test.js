@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatCOP,
   formatMoneda,
+  convertirMoneda,
   parseMonto,
   normalizarFecha,
   corregirAnioProbable,
@@ -23,6 +24,17 @@ test('formatMoneda: USD con prefijo US$, COP como pesos', () => {
   // Otras monedas muestran su código ISO (no se confunden con pesos COP).
   assert.equal(formatMoneda(3907.46, 'MXN'), 'MXN 3,907.46');
   assert.equal(formatMoneda(3306, 'NIO'), 'NIO 3,306');
+});
+
+test('convertirMoneda: base USD (1 USD = rates[C]) entre monedas', () => {
+  const rates = { COP: 4000, USD: 1, MXN: 20, NIO: 36 };
+  assert.equal(convertirMoneda(10, 'USD', 'COP', rates), 40000); // 10 USD → 40.000 COP
+  assert.equal(convertirMoneda(40000, 'COP', 'USD', rates), 10); // 40.000 COP → 10 USD
+  assert.equal(convertirMoneda(20, 'MXN', 'USD', rates), 1);     // 20 MXN → 1 USD
+  assert.equal(convertirMoneda(20, 'MXN', 'COP', rates), 4000);  // 20 MXN → 4.000 COP
+  assert.equal(convertirMoneda(500, 'COP', 'COP', rates), 500);  // misma moneda
+  assert.equal(convertirMoneda(100, 'EUR', 'COP', rates), null); // sin tasa → null
+  assert.equal(convertirMoneda(100, 'COP', 'USD', null), null);  // sin rates → null
 });
 
 test('parseMonto: formato CO con puntos de miles', () => {

@@ -638,6 +638,35 @@ export async function pwaCorregirMovimientoHandler(req) {
 }
 
 /**
+ * Tasas de cambio del día (auth Google). Base USD (1 USD = rates[C] de la moneda
+ * C). Fuente: open.er-api.com (gratis, sin llave, actualiza a diario). Cacheado
+ * ~6 h en la instancia caliente para no golpear la API en cada carga. La PWA las
+ * usa para mostrar el viaje/tarjeta convertido a COP o USD.
+ */
+let _tasasCache = null;
+export async function pwaTasasHandler(req) {
+  const bearer = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  try { await resolvePwaUser(bearer); } catch (e) { return bad(e.message, e.status || 401); }
+  try {
+    // No usamos Date.now() para el corte de caché (determinismo en tests); un TTL
+    // por edad basta con el reloj de la petición.
+    const nowMs = new Date().getTime();
+    if (_tasasCache && (nowMs - _tasasCache.ts) < 6 * 3600 * 1000) return ok(_tasasCache);
+    const resp = await fetch('https://open.er-api.com/v6/latest/USD');
+    const d = await resp.json().catch(() => null);
+    if (!d || d.result !== 'success' || !d.rates || !d.rates.COP) {
+      throw new Error('la fuente de tasas no respondió con datos válidos');
+    }
+    _tasasCache = { ok: true, base: 'USD', fecha: d.time_last_update_utc || null, rates: d.rates, ts: nowMs };
+    return ok(_tasasCache);
+  } catch (e) {
+    // Si hay una tasa cacheada aunque esté algo vieja, mejor devolverla que fallar.
+    if (_tasasCache) return ok({ ..._tasasCache, stale: true });
+    return bad('No se pudo obtener la tasa del día: ' + e.message, 502);
+  }
+}
+
+/**
  * Viajes para la PWA (auth Google). Lectura para todo el equipo; escritura
  * (sacar/agregar/cerrar) solo owners.
  *   GET  /api/pwa-viajes                 → lista de viajes.

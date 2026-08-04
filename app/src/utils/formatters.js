@@ -22,6 +22,23 @@ export function formatMoneda(n, moneda) {
 }
 
 /**
+ * Convierte `monto` de la moneda `from` a `target` usando `rates` (base USD, de
+ * /api/pwa-tasas: 1 USD = rates[C]). Devuelve null si falta la tasa de alguna
+ * moneda (para no inventar un valor). `from`/`target` en ISO ('COP','USD','MXN'…).
+ */
+export function convertirMoneda(monto, from, target, rates) {
+  const f = String(from || 'COP').toUpperCase();
+  const t = String(target || 'COP').toUpperCase();
+  const n = Number(monto) || 0;
+  if (f === t) return n;
+  if (!rates) return null;
+  const rf = f === 'USD' ? 1 : rates[f];
+  const rt = t === 'USD' ? 1 : rates[t];
+  if (!rf || !rt) return null;
+  return (n / rf) * rt; // n → USD → target
+}
+
+/**
  * Parsea montos escritos por humanos a número.
  * Soporta: "45.000", "45,000", "$120.000", "120mil", "1.2M", "45k".
  * @returns {number|null}
