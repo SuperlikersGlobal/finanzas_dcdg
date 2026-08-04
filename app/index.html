@@ -333,6 +333,43 @@ html,body{height:100%;font-family:var(--font-body);background:var(--bg);color:va
 </style>
 </head>
 <body>
+<!-- Diagnóstico: muestra en pantalla cualquier error de JS o una pantalla en
+     blanco (app que no renderizó), en vez de quedar negra. Script clásico inline:
+     corre aunque el bundle de módulos falle al cargar/parsear. -->
+<script>
+(function () {
+  var shown = false;
+  function banner(title, detail) {
+    if (shown) { try { document.getElementById('diag-detail').textContent += '\n\n' + detail; } catch (e) {} return; }
+    shown = true;
+    var d = document.createElement('div');
+    d.id = 'diag-box';
+    d.setAttribute('style', 'position:fixed;inset:0;z-index:99999;background:#1b1b1f;color:#eee;font:13px/1.5 -apple-system,system-ui,sans-serif;padding:20px;overflow:auto;-webkit-overflow-scrolling:touch');
+    d.innerHTML = '<div style="max-width:640px;margin:0 auto">'
+      + '<div style="font-size:16px;font-weight:700;color:#ff6b6b;margin-bottom:8px">⚠️ ' + title + '</div>'
+      + '<div style="color:#aaa;margin-bottom:12px">Mándale esta captura a Claude para arreglarlo.</div>'
+      + '<pre id="diag-detail" style="white-space:pre-wrap;word-break:break-word;background:#000;padding:12px;border-radius:8px;color:#9fe">' + (detail || '') + '</pre>'
+      + '<button onclick="location.reload()" style="margin-top:14px;padding:10px 16px;border-radius:8px;border:0;background:#2E5FA3;color:#fff;font-weight:700">Recargar</button>'
+      + '</div>';
+    (document.body || document.documentElement).appendChild(d);
+  }
+  window.addEventListener('error', function (e) {
+    var m = e && (e.error && (e.error.stack || e.error.message) || e.message) || 'error';
+    var src = e && e.filename ? ('\n@ ' + e.filename + ':' + e.lineno + ':' + e.colno) : '';
+    banner('Error de JavaScript', String(m) + src);
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason; banner('Promesa rechazada', (r && (r.stack || r.message)) || String(r));
+  });
+  // Red de seguridad: si a los 7 s no hay ninguna pantalla visible, avisa.
+  setTimeout(function () {
+    try {
+      var vis = [].slice.call(document.querySelectorAll('.scr')).some(function (s) { return getComputedStyle(s).display !== 'none'; });
+      if (!vis && !shown) banner('La app no renderizó (pantalla en blanco)', 'No se mostró ninguna pantalla tras 7 s. UA: ' + navigator.userAgent);
+    } catch (e2) { banner('La app no renderizó', String(e2)); }
+  }, 7000);
+})();
+</script>
 <div id="app">
 
 <!-- ── HEADER ── -->
