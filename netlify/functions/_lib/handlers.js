@@ -365,6 +365,42 @@ export function makeTarjetaHandler() {
 }
 
 /**
+ * Préstamos/abonos Luis↔Carolina para SilvIA (carril token). Reutiliza el mismo
+ * backend (con asiento) que la PWA. Direcciones: "de" le dio la plata a "para",
+ * así que "para" queda debiéndole a "de". Un abono se registra en el sentido de
+ * quien paga (de=quien_paga), lo que reduce lo que quien_paga debe.
+ *   GET  o POST {accion:'saldo'}          → saldo neto (quién le debe a quién).
+ *   POST {de, para, monto, concepto?, fecha?, moneda?}  → registra y devuelve el nuevo saldo.
+ */
+export function makePrestamoHandler() {
+  return async (req) => {
+    const auth = authorize(req);
+    if (!auth.ok) return auth.response;
+    try {
+      if (req.method === 'GET') {
+        const prestamos = await listPrestamos({});
+        return ok({ ok: true, saldo: calcularSaldoPrestamos(prestamos) });
+      }
+      const body = await parseBody(req);
+      const accion = String(body.accion || 'crear').toLowerCase();
+      if (accion === 'saldo') {
+        const prestamos = await listPrestamos({});
+        return ok({ ok: true, saldo: calcularSaldoPrestamos(prestamos) });
+      }
+      const p = await registrarPrestamoConAsiento({
+        fecha: String(body.fecha || '').slice(0, 10) || hoyISO(),
+        de: body.de, para: body.para, monto: body.monto,
+        concepto: body.concepto, moneda: body.moneda, notas: body.notas,
+      });
+      const saldo = calcularSaldoPrestamos(await listPrestamos({}));
+      return ok({ ok: true, prestamo: p, saldo });
+    } catch (e) {
+      return bad(e.message, e.status || 422);
+    }
+  };
+}
+
+/**
  * Handler de captura por correo (carril token). Body: { message_id, from,
  * subject, body }. Parsea la notificación bancaria y, si es un gasto reconocido,
  * lo registra + contabiliza (idempotente por message-id). Ingresos/transferencias
