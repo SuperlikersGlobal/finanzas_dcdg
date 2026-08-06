@@ -966,3 +966,12 @@ if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 }
+
+// Registra el service worker (habilita instalar la PWA como app: standalone, con
+// ícono propio, sin barra del navegador). Es network-first (ver sw.js), así que
+// no introduce riesgo de caché obsoleto.
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => { /* si falla, la app funciona igual */ });
+  });
+}

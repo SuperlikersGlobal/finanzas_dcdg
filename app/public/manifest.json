@@ -4,8 +4,8 @@
   "description": "Control financiero familiar DCDG — captura y clasificación de gastos.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0b1220",
-  "theme_color": "#0b1220",
+  "background_color": "#191512",
+  "theme_color": "#191512",
   "icons": [
     {
       "src": "/icon-192.png",
