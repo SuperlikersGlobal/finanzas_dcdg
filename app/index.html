@@ -487,6 +487,23 @@ html,body{min-height:100%;font-family:var(--font-body);background:var(--bg);colo
 }
 @media (min-width:1000px){ :root{--pad-x:32px} .grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))} }
 @media (max-height:520px){ .card{padding:14px} .scr{gap:10px} :root{--fs-num-hero:30px} }
+/* Pantallas angostas (teléfono / Fold PLEGADO): escala compacta para que no se
+   vea gigante y quepa más de una tarjeta. El desplegado (≥760) no se toca. */
+@media (max-width:600px){
+  :root{--fs-h2:22px;--fs-num-hero:clamp(29px,8.4vw,34px);--fs-num:clamp(18px,5vw,22px);
+    --r:22px;--r-s:16px;--pad-x:15px}
+  .hdr{padding:max(10px,calc(env(safe-area-inset-top) + 6px)) var(--pad-x) 10px;gap:8px}
+  .hdr-l .title{font-size:19px}
+  .conn-badge{font-size:12px;padding:5px 9px;gap:5px}
+  .scr{gap:11px;padding-top:14px}
+  .card{padding:15px}
+  .card-ttl{font-size:14.5px;margin-bottom:8px}
+  .h-name{font-size:16px}
+  .acc > button{min-height:72px;padding:13px 14px}
+  .acc-t{font-size:16px}
+  .alerta{padding:12px 14px}
+  .alerta-t{font-size:16px}
+}
 .toast{position:fixed;bottom:calc(var(--tabbar-h) + 20px + env(safe-area-inset-bottom));left:50%;
   transform:translateX(-50%) translateY(10px);background:var(--ink);color:var(--bg);
   padding:13px 20px;border-radius:var(--r-pill);font-size:var(--fs-body);font-weight:700;opacity:0;
