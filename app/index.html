@@ -343,6 +343,18 @@ html,body{height:100%;font-family:var(--font-body);background:var(--bg);color:va
   .tab.on .tab-ico,.a-cam .act-ico,.a-inc .act-ico{}
 }
 
+/* Pantallas anchas (Galaxy Fold desplegado, tablets, escritorio): la app está
+   pensada con tamaños fijos de teléfono, así que se veía chica y con mucho
+   espacio vacío. Aquí se ESCALA el contenido 1.4× con `zoom` y se ajusta el
+   ancho para llenar sin desbordar (width = 100vw/1.4, tope 640 → 896 en
+   escritorio). La barra inferior está dentro de #app y hereda el zoom (por eso
+   NO lleva zoom propio, solo el ancho). Teléfonos y Fold plegado (<540px) no
+   cambian. Va al FINAL de la hoja para ganar en orden a las reglas base. */
+@media (min-width:540px){
+  #app{max-width:none;width:min(calc(100vw / 1.4), 640px);zoom:1.4}
+  .tabbar{max-width:none;width:min(calc(100vw / 1.4), 640px)}
+}
+
 </style>
 </head>
 <body>
