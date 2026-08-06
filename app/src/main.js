@@ -18,7 +18,7 @@ import { analizarTexto, analizarImagen } from './services/claude.js';
 import { getCuentas, getCatalogos } from './services/finanzas.js';
 import {
   getSessionToken, signOut as authSignOut, isSignedIn,
-  initSignIn, renderSignInButton, promptOneTap, gisReady,
+  initSignIn, renderSignInButton, promptOneTap, gisReady, currentUser,
 } from './services/auth.js';
 import { procesarRecibo } from './utils/imageProcessor.js';
 import { procesarReciboPDF } from './utils/pdfProcessor.js';
@@ -75,7 +75,8 @@ function tabFor(s) {
 }
 function setActiveTab(s) {
   const t = tabFor(s);
-  document.querySelectorAll('.tab').forEach((el) => el.classList.toggle('on', el.dataset.go === t));
+  // Marca la pestaña activa en la tab bar (móvil) y en la barra lateral (Fold).
+  document.querySelectorAll('.tab,.rail-i').forEach((el) => el.classList.toggle('on', el.dataset.go === t));
 }
 
 function go(s) {
@@ -83,6 +84,10 @@ function go(s) {
   const el = V('scr-' + s);
   if (el) el.classList.add('on');
   setActiveTab(s);
+  // `authed` habilita la navegación (tab bar / barra lateral): solo cuando hay
+  // sesión y no estamos en login/setup. Sin ella, el CSS oculta ambas barras.
+  const app = V('app');
+  if (app) app.classList.toggle('authed', isSignedIn() && s !== 'login' && s !== 'setup');
   window.scrollTo(0, 0);
   if (s === 'settings') {
     const cfg = getConfig();
@@ -169,6 +174,13 @@ function resetAll() {
 function setConn(on) {
   V('conn-dot').className = 'conn-dot' + (on ? ' on' : '');
   V('conn-lbl').textContent = on ? 'Conectado' : 'Sin conectar';
+  // Datos del usuario en la barra lateral (Fold desplegado).
+  const u = on ? (currentUser() || {}) : {};
+  const email = String(u.email || '');
+  const nombre = /caro/i.test(email) ? 'Carolina' : /luis/i.test(email) ? 'Luis' : (email.split('@')[0] || '—');
+  const av = V('rail-av'); if (av) av.textContent = (nombre[0] || '·').toUpperCase();
+  const rn = V('rail-nombre'); if (rn) rn.textContent = on ? nombre : '—';
+  const rr = V('rail-rol'); if (rr) rr.textContent = on ? (u.rol || 'Conectado') : 'Sin conectar';
   // Muestra/oculta la tab bar inferior según haya sesión (oculta en login/setup).
   const app = document.getElementById('app');
   if (app) app.classList.toggle('authed', !!on);
